@@ -331,7 +331,7 @@ This router is not the fastest especially when using **Classic** PHP modes as it
 
 ### Benchmark
 
-Here is a test running against 178 routes. See `benchmark/route2/routes.php`. The baselines are doing no routing and responding immediately.
+Here is a test running against 178 routes. See `benchmark/routes.php`. The baselines are doing no routing and responding immediately.
 
 **Note**: This is running on year 2014 level desktop shared hardware. (`Xeon E3-1226 v3`)
 
