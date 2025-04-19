@@ -27,7 +27,7 @@ Requires PHP 8.1 or newer
 
 - [Usage](#usage)
   - [FrankenPHP Worker Mode](#frankenphp-worker-mode)
-  - [Basic Routing](#basic-routing)
+- [Basic Routing](#basic-routing)
   - [Available Methods](#available-methods)
   - [Multiple HTTP-verbs](#multiple-http-verbs)
 - [Route Parameters](#route-parameters)
