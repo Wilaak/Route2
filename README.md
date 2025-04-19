@@ -58,7 +58,7 @@ Here's a basic getting started example:
 ```php
 <?php
 
-require __DIR__.'/vendor/autoload.php';
+require __DIR__.'/../vendor/autoload.php';
 
 use Wilaak\Http\Route2;
 
@@ -80,7 +80,7 @@ Boot your application once and keep it in memory by using [worker mode](https://
 
 ignore_user_abort(true);
 
-require __DIR__.'/vendor/autoload.php';
+require __DIR__.'/../vendor/autoload.php';
 
 use Wilaak\Http\Route2;
 
