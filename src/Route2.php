@@ -309,7 +309,7 @@ class Route2
     public static function dispatch(?string $method = null, ?string $uri = null): bool
     {
         $method = strtoupper($method ?? $_SERVER['REQUEST_METHOD']);
-        $uri = rawurldecode($uri = strtok($uri ?? self::getRelativeRequestUri(), '?'));
+        $uri = rawurldecode(strtok($uri ?? self::getRelativeRequestUri(), '?'));
 
         $routes = self::matchRoute($uri);
 
