@@ -131,7 +131,7 @@ Route2::match('get|post', '/', function() {
     // matches any method you like
 });
 
-Route2::forms('/', function() {
+Route2::form('/', function() {
     // matches GET and POST methods
 });
 
