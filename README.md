@@ -346,7 +346,7 @@ Route2::fromCache(
 
 ### Benchmarks
 
-Here's a benchmark done against 178 routes. See `benchmark/routes.php`. This test was done using FrankenPHP and `wrk` on a Windows 11 machine running in WSL with an `Intel® Core™ i5-12400 Processor` from 2022.
+This test was done using FrankenPHP and `wrk` on a Windows 11 machine running in WSL with an Intel® Core™ i5-12400 Processor from 2022.
 
 
 | Benchmark | Routes| Average Latency | Requests Per Second
