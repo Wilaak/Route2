@@ -70,6 +70,12 @@ class Route2
             );
         }
         self::$cacheFilepath = $filepath;
+
+        if (file_exists($filepath) === false) {
+            self::$cacheGenerate = true;
+            return;
+        }
+
         if ($expire === false || $expire === 0 || @filemtime($filepath) >= time() - $expire) {
             self::$routeTree = require $filepath;
             self::$cacheEnabled = true;
