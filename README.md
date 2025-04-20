@@ -332,7 +332,7 @@ RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
 
 This router leverages a tree-based algorithm to more efficiently lookup routes. But if you generate the tree for each request it can become even slower than not using one. For faster application boot times you can enable route tree caching. Simply call the `fromCache` method before defining any routes in your application.
 
-The named argument `expire` can be set to an integer representing how many seconds til the cache gets invalidated and rebuilt again.
+The named argument `expire` can be set to an integer representing how many seconds till the cache gets invalidated and rebuilt again.
 
 ```php
 Route2::fromCache(
