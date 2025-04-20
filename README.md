@@ -42,13 +42,14 @@ Requires PHP 8.1 or newer
   - [Without prefix](#without-prefix)
 - [Troubleshooting](#troubleshooting)
   - [Dispatching](#dispatching)
-  - [Accessing your routes](#accessing-your-routes)
-- [Hide scriptname from URL](#hide-scriptname-from-url)
+  - [Accessing Routes](#accessing-routes)
+- [Hide Scriptname From Url](#hide-scriptname-from-url)
   - [FrankenPHP](#frankenphp)
   - [NGINX](#nginx)
   - [Apache](#apache)
 - [Performance](#performance)
-  - [Benchmark](#benchmark)
+  - [Enable Route Cache](#enable-route-cache)
+  - [Benchmarks](#benchmarks)
 - [License](#license)
 
 ## Usage
@@ -128,15 +129,15 @@ Sometimes you may need to register a route that responds to multiple HTTP-verbs.
 
 ```php
 Route2::match('get|post', '/', function() {
-    // matches any method you like
+    // Matches any method you like
 });
 
 Route2::form('/', function() {
-    // matches GET and POST methods
+    // Matches GET and POST methods
 });
 
 Route2::any('/', function() {
-    // matches any HTTP method
+    // Matches any HTTP method
 });
 ```
 
@@ -145,7 +146,7 @@ Route2::any('/', function() {
 
 Sometimes you will need to capture segments of the URI within your route. For example, you may need to capture a user's ID from the URL. You may do so by defining route parameters:
 
-**Note**: The parameters injected into the controller will always be of type `string`.
+**Note**: Parameters must start and end with forward slashes (e.g., `/{param}/`). Arguments injected into the controller will always be of type string.
 
 You may define as many route parameters as required by your route:
 
@@ -167,7 +168,7 @@ Route2::get('/user/{id}', function ($id) {
 
 ### Optional Parameters
 
-Specify a route parameter that may not always be present in the URI. You may do so by placing a ? mark after the parameter name.
+Specify a route parameter that may not always be present in the URI. You may do so by placing a `?` mark after the parameter name.
 
 **Note**: Make sure to give the route's corresponding variable a default value:
 
@@ -179,7 +180,7 @@ Route2::get('/user/{name?}', function (string $name = 'John') {
 
 ### Wildcard Parameters
 
-Capture the whole segment including slashes by placing a * after the parameter name.
+Capture the whole segment including slashes by placing a `*` after the parameter name.
 
 **Note**: Make sure to give the route's corresponding variable a default value:
 
@@ -288,13 +289,13 @@ if (!Route2::dispatch()) {
 }
 ```
 
-### Accessing your routes
+### Accessing Routes
 
 The simplest way to access your routes is to put the file in your folder and run it.
 
 For example if you request ```http://your.site/yourscript.php/your/route``` it will automatically adjust to `/your/route`.
 
-## Hide scriptname from URL
+## Hide Scriptname From URL
 
 Want to hide that pesky script name (e.g., `index.php`) from the URL?
 
@@ -327,11 +328,25 @@ RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
 
 ## Performance
 
-This router is not the fastest especially when using **Classic** PHP modes as it has to compile the routing tree for each request. If performance is crucial consider something else.
+### Enable Route Cache
 
-### Benchmark
+This router leverages a tree-based algorithm to more efficiently lookup routes. But if you generate the tree for each request it can become even slower than not using one. For faster application boot times you can enable route tree caching. Simply call the `fromCache` method before defining any routes in your application.
 
-Here is a test running against 178 routes. See `benchmark/routes.php`. The baselines are doing no routing and responding immediately.
+The named argument `expire` can be set to an integer representing how many seconds til the cache gets invalidated and rebuilt again.
+
+```php
+Route2::fromCache(
+    enabled: true,
+    expire: false,
+    filepath: 'Route2.cache.php'
+);
+
+// Define routes below...
+```
+
+### Benchmarks
+
+Here is a test running against 178 routes. See `benchmark/routes.php`. The baselines have no routes defined.
 
 **Note**: This is running on year 2014 level desktop shared hardware. (`Xeon E3-1226 v3`)
 
@@ -339,17 +354,13 @@ Here is a test running against 178 routes. See `benchmark/routes.php`. The basel
 +------------------------+-----------+------------+
 | Benchmark              | Latency   | Per Second |
 +------------------------+-----------+------------+
-| Baseline\Worker        | 19.94ms   | 20765.94   |
-| Route2\Worker          | 22.65ms   | 18092.66   |
-| Baseline\Classic       | 177.44ms  | 7731.38    | 
-| Route2\Classic         | 114.87ms  | 3400.63    | 
+| Baseline Worker        | 40.38ms   | 16200.11   |
+| Route2 Worker          | 40.29ms   | 15276.07   |
+| Baseline Classic       | 49.80ms   | 10727.32   |
+| Route2 Classic Cache   | 73.94ms   | 6606.94    |
+| Route2 Classic         | 163.83ms  | 2948.85    |
 +------------------------+-----------+------------+
 ```
-
-Test was done using `wrk`on the same machine:
-
-    wrk -t8 -c400 -d5s http://127.0.0.1:8080
-
 
 ## License
 

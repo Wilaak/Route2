@@ -3,6 +3,7 @@
 namespace Wilaak\Http;
 
 use InvalidArgumentException;
+use OutOfBoundsException;
 
 /**
  * A simple routing library for PHP web applications.
@@ -16,23 +17,67 @@ class Route2
      * Route tree structure.
      * 
      * The tree is structured as follows:
-     * - Each node represents a segment of the URI.
-     * - Each segment can have child segments.
-     * - The `(int) 1337` key contains an array of child nodes.
-     * - Each child node contains:
-     *  - `methods`: An array of HTTP methods (e.g., GET, POST).
-     *  - `uri`: The URI pattern for the route.
-     *  - `controller`: The controller function to handle the route.
-     *  - `middleware`: An array of middleware functions to execute
+     * - Each key is a segment of the URI (e.g., (string) "/myroute").
+     * - Each value is an array containing:
+     *  - (int) "1337": An array of route identifiers.
+     *  - Other segments as keys for further nesting.
      */
-    private static array $routeTree = [];
+    static array $routeTree = [];
 
     /**
-     * Route addition context.
+     * Route creation context.
      */
     private static string $routeGroupPrefix = '';
     private static array $middlewareStack = [];
     private static array $expressionStack = [];
+
+    /**
+     * Route attributes table.
+     * 
+     * The attributes table is structured as follows:
+     * - Each key is a combination of the HTTP method and URI (e.g., "GET|POST /myroute").
+     * - Each value is an associative array containing:
+     *  - `controller`: The controller function to handle the route.
+     *  - `middleware`: An array of middleware functions to execute.
+     *  - `expression`: An array of parameter expressions for validation.
+     */
+    static array $routeAttributes = [];
+
+    /**
+     * Route cache properties.
+     */
+    static bool $cacheEnabled = false;
+    static bool $cacheGenerate = false;
+    static string $cacheFilepath;
+
+    /**
+     * Loads and stores the route tree in a file for faster startup time.
+     *
+     * @param bool      $enabled  Whether to enable caching.
+     * @param int|false $expire   The cache expiration time in seconds. If false, the cache never expires.
+     * @param string    $filepath The path to the cache file.
+     *
+     * @throws InvalidArgumentException If route caching is enabled after routes have been defined.
+     */
+    public static function fromCache(bool $enabled = true, int|false $expire = false, string $filepath = 'Route2.cache.php'): void
+    {
+        if ($enabled === false) {
+            return;
+        }
+        if (self::$routeTree !== []) {
+            throw new InvalidArgumentException(
+                'Route caching cannot be enabled after routes have been defined.'
+            );
+        }
+        self::$cacheFilepath = $filepath;
+        if ($expire === false || $expire === 0 || @filemtime($filepath) >= time() - $expire) {
+            self::$routeTree = require $filepath;
+            self::$cacheEnabled = true;
+            return;
+        }
+        @unlink(self::$cacheFilepath);
+        self::$cacheGenerate = true;
+    }
 
     /**
      * Adds a new route to the routing tree.
@@ -57,11 +102,28 @@ class Route2
      */
     public static function match(string $methods, string $uri, callable $controller, ?callable $middleware = null, array $expression = []): void
     {
-        $methods = explode('|', strtoupper($methods));
+        $methods = strtoupper(
+            str_replace(' ', '', $methods)
+        );
+
+        $identifier = $methods . ' ' . self::$routeGroupPrefix . $uri;
+        if (array_key_exists($identifier, self::$routeAttributes)) {
+            throw new InvalidArgumentException("Found duplicate route entries for '{$identifier}'. Please check your routes.");
+        }
 
         $middlewareStack = self::$middlewareStack;
-        if ($middleware) {
+        if ($middleware !== null) {
             $middlewareStack['before'][] = $middleware;
+        }
+
+        self::$routeAttributes[$identifier] = [
+            'controller' => $controller,
+            'middleware' => $middlewareStack,
+            'expression' => self::$expressionStack + $expression,
+        ];
+
+        if (self::$cacheEnabled) {
+            return;
         }
 
         $segments = preg_replace('/\/\{(\w+)(\?|(\*))?\}(?=\/|$)/', '/*', $uri);
@@ -73,13 +135,7 @@ class Route2
             $currentNode = &$currentNode[$segment];
         }
 
-        $currentNode[1337][] = [
-            'uri'        => self::$routeGroupPrefix . $uri,
-            'methods'    => $methods,
-            'controller' => $controller,
-            'middleware' => $middlewareStack,
-            'expression' => self::$expressionStack + $expression,
-        ];
+        $currentNode[1337][] = $identifier;
     }
 
     /**
@@ -301,32 +357,49 @@ class Route2
     /**
      * Dispatches the request to the appropriate route.
      *
-     * @param string|null $method The HTTP method to match against the routes. If null, uses the current request method.
-     * @param string|null $uri    The URI to match against the routes. If null, uses the current relative request URI.
+     * @param string|null $requestMethod The HTTP method of the request (e.g., GET, POST). If not provided, it will use the current request method.
+     * @param string|null $requestUri    The URI of the request. If not provided, it will use the current relative request URI.
      *
      * @return bool True if a route was matched and dispatched, false otherwise.
      */
-    public static function dispatch(?string $method = null, ?string $uri = null): bool
+    public static function dispatch(?string $requestMethod = null, ?string $requestUri = null): bool
     {
-        $method = strtoupper($method ?? $_SERVER['REQUEST_METHOD']);
-        $uri = rawurldecode(strtok($uri ?? self::getRelativeRequestUri(), '?'));
+        $requestMethod = strtoupper(
+            $requestMethod ?? $_SERVER['REQUEST_METHOD']
+        );
+        $requestUri = rawurldecode(
+            strtok($requestUri ?? self::getRelativeRequestUri(), '?')
+        );
 
-        $routes = self::matchRoute($uri);
+        if (self::$cacheGenerate) {
+            file_put_contents(
+                self::$cacheFilepath,
+                '<?php return ' . var_export(self::$routeTree, true) . ';'
+            );
+        }
+
+        $routes = self::matchRoute($requestUri);
 
         foreach ($routes as $route) {
-            if (!in_array($method, $route['methods'])) {
+
+            [$routeMethods, $routeUri] = explode(' ', $route, 2);
+
+            if (!in_array($requestMethod, explode('|', $routeMethods))) {
                 continue;
             }
 
-            $pattern = preg_replace(
+            $routePattern = preg_replace(
                 ['/\{(\w+)\}/', '/\{(\w+)\?\}/', '/\{(\w+)\*\}/'],
                 ['(?P<$1>[^/]+)', '(?P<$1>[^/]*)', '(?P<$1>.*)'],
-                $route['uri']
+                $routeUri
             );
-            $pattern = '#^' . $pattern . '$#';
-
-            if (!preg_match($pattern, $uri, $matches)) {
+            $routePattern = '#^' . $routePattern . '$#';
+            if (!preg_match($routePattern, $requestUri, $matches)) {
                 continue;
+            }
+
+            if (!isset(self::$routeAttributes[$route])) {
+                throw new OutOfBoundsException("Failed to fetch route attributes for '{$route}'. Maybe try rebuilding the route cache?");
             }
 
             foreach ($matches as $key => $value) {
@@ -335,39 +408,31 @@ class Route2
                 }
             }
 
-            foreach ($route['expression'] as $param => $expression) {
+            foreach (self::$routeAttributes[$route]['expression'] as $param => $expression) {
                 if (!isset($params[$param])) {
                     continue;
                 }
-
                 if (is_callable($expression) && !$expression($params[$param])) {
                     continue 2;
                 }
-
                 if (is_string($expression) && !preg_match('#^' . $expression . '$#', $params[$param])) {
                     continue 2;
                 }
-
                 if (!is_string($expression) && !is_callable($expression)) {
                     throw new InvalidArgumentException(
                         "Expression for parameter '{$param}' must be a regex string or callable function"
                     );
                 }
             }
-
-            foreach ($route['middleware']['before'] ?? [] as $middleware) {
+            foreach (self::$routeAttributes[$route]['middleware']['before'] ?? [] as $middleware) {
                 $middleware();
             }
-
-            $route['controller'](...$params ?? []);
-
-            foreach ($route['middleware']['after'] ?? [] as $middleware) {
+            self::$routeAttributes[$route]['controller'](...$params ?? []);
+            foreach (self::$routeAttributes[$route]['middleware']['after'] ?? [] as $middleware) {
                 $middleware();
             }
-
             return true;
         }
-
         return false;
     }
 }
