@@ -330,7 +330,7 @@ RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
 
 ### Enable Route Cache
 
-To optimize route lookups, this router uses a tree-based algorithm. However, regenerating the tree for every request can negate its benefits and slow down performance. To improve application boot times, you can enable route tree caching. Simply invoke the `fromCache` method before defining any routes in your application.
+To optimize route lookups, this router uses a tree-based algorithm. However, regenerating the tree for every request slows down performance. To improve application boot times, you can enable route tree caching. Simply invoke the `fromCache` method before defining any routes in your application.
 
 The named argument `expire` can be set to an integer representing how many seconds till the cache gets invalidated and rebuilt again.
 
@@ -346,9 +346,7 @@ Route2::fromCache(
 
 ### Benchmarks
 
-Here's a benchmark done against 178 routes. See `benchmark/routes.php`.
-
-This test was done using FrankenPHP and `wrk` on a Windows 11 machine running in WSL with an `Intel Core i5-12400`
+Here's a benchmark done against 178 routes. See `benchmark/routes.php`. This test was done using FrankenPHP and `wrk` on a Windows 11 machine running in WSL with an `Intel® Core™ i5-12400 Processor` from 2022.
 
 
 | Benchmark | Routes| Average Latency | Requests Per Second
