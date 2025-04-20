@@ -330,7 +330,7 @@ RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
 
 ### Enable Route Cache
 
-This router leverages a tree-based algorithm to more efficiently lookup routes. But if you generate the tree for each request it can become even slower than not using one. For faster application boot times you can enable route tree caching. Simply call the `fromCache` method before defining any routes in your application.
+To optimize route lookups, this router uses a tree-based algorithm. However, regenerating the tree for every request can negate its benefits and slow down performance. To improve application boot times, you can enable route tree caching. Simply invoke the `fromCache` method before defining any routes in your application.
 
 The named argument `expire` can be set to an integer representing how many seconds till the cache gets invalidated and rebuilt again.
 
@@ -346,21 +346,18 @@ Route2::fromCache(
 
 ### Benchmarks
 
-Here is a test running against 178 routes. See `benchmark/routes.php`. The baselines have no routes defined.
+Here's a benchmark done against 178 routes. See `benchmark/routes.php`.
 
-**Note**: This is running on year 2014 level desktop shared hardware. (`Xeon E3-1226 v3`)
+This test was done using FrankenPHP and `wrk` on a Windows 11 machine running in WSL with an `Intel Core i5-12400`
 
-```
-+------------------------+-----------+------------+
-| Benchmark              | Latency   | Per Second |
-+------------------------+-----------+------------+
-| Baseline Worker        | 40.38ms   | 16200.11   |
-| Route2 Worker          | 40.29ms   | 15276.07   |
-| Baseline Classic       | 49.80ms   | 10727.32   |
-| Route2 Classic Cache   | 73.94ms   | 6606.94    |
-| Route2 Classic         | 163.83ms  | 2948.85    |
-+------------------------+-----------+------------+
-```
+
+| Benchmark | Routes| Average Latency | Requests Per Second
+| --- | ----------- | - | - |
+Worker Baseline | 1 |82.11ms | 62327.59
+Worker | 178 (bitbucket) | 81.94ms | 57133.98
+Classic Baseline | 1 | 104.75ms | 36100.91
+Classic Cached | 178 (bitbucket) | 109.69ms |25992.43
+Classic | 178 (bitbucket) | 31.35ms | 15652.60 
 
 ## License
 
