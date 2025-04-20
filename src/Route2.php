@@ -64,7 +64,7 @@ class Route2
             $middlewareStack['before'][] = $middleware;
         }
 
-        $segments = preg_replace('/\{(\w+)(\?|(\*))?\}/', '*', $uri);
+        $segments = preg_replace('/\/\{(\w+)(\?|(\*))?\}/', '/*', $uri);
         $segments = preg_split('/(?=\/)/', self::$routeGroupPrefix . $segments, -1, PREG_SPLIT_NO_EMPTY);
 
         $currentNode = &self::$routeTree;
