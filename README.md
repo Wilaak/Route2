@@ -25,6 +25,36 @@ Requires PHP 8.1 or newer
 
 ---
 
+## Table of Contents
+
+- [Usage](#usage)
+  - [FrankenPHP Worker Mode](#frankenphp-worker-mode)
+- [Basic Routing](#basic-routing)
+  - [Available Methods](#available-methods)
+  - [Multiple HTTP-verbs](#multiple-http-verbs)
+- [Route Parameters](#route-parameters)
+  - [Required Parameters](#required-parameters)
+  - [Optional Parameters](#optional-parameters)
+  - [Wildcard Parameters](#wildcard-parameters)
+  - [Parameter Constraints](#parameter-constraints)
+  - [Global Constraints](#global-constraints)
+- [Middleware](#middleware)
+  - [Registering Middleware](#registering-middleware)
+- [Route Groups](#route-groups)
+  - [Without prefix](#without-prefix)
+- [Dispatching](#dispatching)
+  - [Return Status Codes](#return-status-codes)
+- [Troubleshooting](#troubleshooting)
+  - [Accessing Routes](#accessing-routes)
+- [Hide Scriptname From URL](#hide-scriptname-from-url)
+  - [FrankenPHP](#frankenphp)
+  - [NGINX](#nginx)
+  - [Apache](#apache)
+- [Performance](#performance)
+  - [Enable Route Cache](#enable-route-cache)
+  - [Benchmarks](#benchmarks)
+- [License](#license)
+
 ## Usage
 
 Here's a basic getting started example:
@@ -40,9 +70,30 @@ Route2::get('/{world?}', function($world = 'World') {
     echo "Hello, $world!";
 });
 
-if (Route2::dispatch()) return;
-http_response_code(404);
-echo '404 Not Found';
+$status = Route2::dispatch();
+
+if ($status['code'] === Route2::DISPATCH_FOUND) {
+    return;
+}
+
+if ($status['code'] === Route2::DISPATCH_NOT_FOUND) {
+    http_response_code(404);
+    echo <<<HTML
+        <h1>404 Page Not Found</h1> 
+    HTML;
+    return;
+}
+
+if ($status['code'] === Route2::DISPATCH_NOT_ALLOWED) {
+    http_response_code(405);
+    $allowedMethods = implode(',', $status['allowed_methods']);
+    header('Allow: ' . $allowedMethods);
+    echo <<<HTML
+        <h1>405 Method Not Allowed</h1><br>
+        <p>Allowed Methods: $allowedMethods</p>
+        HTML;
+    return;
+}
 ```
 
 ### FrankenPHP Worker Mode
@@ -63,9 +114,30 @@ Route2::get('/{world?}', function($world = 'World') {
 });
 
 $handler = static function() {
-    if (Route2::dispatch()) return;
-    http_response_code(404);
-    echo '404 Not Found';
+    $status = Route2::dispatch();
+
+    if ($status['code'] === Route2::DISPATCH_FOUND) {
+        return;
+    }
+
+    if ($status['code'] === Route2::DISPATCH_NOT_FOUND) {
+        http_response_code(404);
+        echo <<<HTML
+            <h1>404 Page Not Found</h1> 
+        HTML;
+        return;
+    }
+
+    if ($status['code'] === Route2::DISPATCH_NOT_ALLOWED) {
+        http_response_code(405);
+        $allowedMethods = implode(',', $status['allowed_methods']);
+        header('Allow: ' . $allowedMethods);
+        echo <<<HTML
+            <h1>405 Method Not Allowed</h1><br>
+            <p>Allowed Methods: $allowedMethods</p>
+            HTML;
+        return;
+    }
 };
 
 while (frankenphp_handle_request($handler)) {
@@ -252,7 +324,7 @@ Route2::group(callback: function () {
 
 A URI is dispatched by calling the `dispatch()` method. This method accepts an HTTP method and a URI. If none are provided it uses the `$_SERVER['REQUEST_METHOD']` and internal `getRelativeRequestUri()` method which returns the relative URI of the current HTTP request. (e.g., `/folder/index.php/myroute` → `/myroute`)
 
-### Status Codes
+### Return Status Codes
 
 The `dispatch()` method returns an array with a status code that is either `Route2::DISPATCH_FOUND`, `Route2::DISPATCH_NOT_FOUND` or `Route2::DISPATCH_NOT_ALLOWED`.
 
@@ -267,14 +339,20 @@ if ($status['code'] === Route2::DISPATCH_FOUND) {
 
 if ($status['code'] === Route2::DISPATCH_NOT_FOUND) {
     http_response_code(404);
-    echo '404 Not Found';
+    echo <<<HTML
+        <h1>404 Page Not Found</h1> 
+    HTML;
     return;
 }
 
 if ($status['code'] === Route2::DISPATCH_NOT_ALLOWED) {
     http_response_code(405);
-    header('Allow: ' . implode(', ', $status['allowed_methods']));
-    echo '405 Method Not Allowed';
+    $allowedMethods = implode(',', $status['allowed_methods']);
+    header('Allow: ' . $allowedMethods);
+    echo <<<HTML
+        <h1>405 Method Not Allowed</h1><br>
+        <p>Allowed Methods: $allowedMethods</p>
+        HTML;
     return;
 }
 ```
