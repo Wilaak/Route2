@@ -14,11 +14,12 @@ use OutOfBoundsException;
 class Route2
 {
     /**
-     * Route dispatch return status constants.
+     * An array to store fallback routes.
+     * This is used to define fallback mechanisms for routing when no specific route matches a request.
+     *
+     * @var array
      */
-    const DISPATCH_NOT_FOUND = 0;
-    const DISPATCH_FOUND = 1;
-    const DISPATCH_NOT_ALLOWED = 2;
+    private static array $fallbacks = [];
 
     /**
      * Route tree structure.
@@ -56,6 +57,45 @@ class Route2
     private static bool $cacheEnabled = false;
     private static bool $cacheGenerate = false;
     private static string $cacheFilepath;
+
+    /**
+     * Sets a fallback function to be executed when no route matches.
+     * 
+     * 
+     * @param string|null   $prefix   Optional prefix to be applied to the fallback route.
+     * @param callable|null $callback The fallback function to execute.
+     *                                It should accept the request method and URI as parameters.
+     *                                Example: `Route2::fallback(function($method, $uri) { ... })`
+     *
+     * @return void
+     */
+    public static function fallback(?string $prefix = null, ?callable $callback = null): void
+    {
+        $prefix = $prefix ?? self::$routeGroupPrefix;
+        $prefix = $prefix === '' ? '/' : $prefix;
+        self::$fallbacks[$prefix] = $callback;
+        // Sort the fallbacks by the length of the prefix in descending order.
+        uksort(self::$fallbacks, function ($a, $b) {
+            return strlen($b) <=> strlen($a);
+        });
+    }
+
+    /**
+     * Handles the 404 Not Found response.
+     * 
+     * This method is called when a requested route is not found under `dispatch()`.
+     */
+    private static function dispatchNotFound(string $requestMethod, string $requestUri): void
+    {
+        http_response_code(404);
+        foreach (self::$fallbacks as $prefix => $callback) {
+           if (str_starts_with($requestUri, $prefix)) {
+               $callback($requestMethod, $requestUri);
+               return;
+           }
+        }
+        echo '404 Not Found';
+    }
 
     /**
      * Loads and stores the route tree in a file for faster startup time.
@@ -276,7 +316,7 @@ class Route2
      * Preserves and restores the previous state after the callback.
      * 
      * @param string|null   $prefix   Optional prefix to be applied to all routes in the group.
-     * @param callable|null $callback A callback function that defines the routes within the group. Required.
+     * @param callable|null $callback A callback function that defines the routes within the group.
      * 
      * @return void
      */
@@ -373,11 +413,9 @@ class Route2
      * @param string|null $requestMethod The HTTP method of the request (e.g., GET, POST). If not provided, it will use the current request method.
      * @param string|null $requestUri    The URI of the request. If not provided, it will use the current relative request URI.
      *
-     * @return array Returns an array containing the status code and allowed methods if applicable.
-     *               - 'code': The status code (e.g., FOUND, NOT_FOUND, METHOD_NOT_ALLOWED).
-     *               - 'allowed_methods': An array of allowed HTTP methods if the method is not allowed.
+     * @return bool Returns true if a route was matched and dispatched, false otherwise.
      */
-    public static function dispatch(?string $requestMethod = null, ?string $requestUri = null): array
+    public static function dispatch(?string $requestMethod = null, ?string $requestUri = null): bool
     {
         $requestMethod = strtoupper(
             $requestMethod ?? $_SERVER['REQUEST_METHOD']
@@ -449,19 +487,14 @@ class Route2
             foreach (self::$routeAttributes[$route]['middleware']['after'] ?? [] as $middleware) {
                 $middleware();
             }
-            return [
-                'code' => self::DISPATCH_FOUND
-            ];
+            return true;
         }
-
         if (!empty($allowedMethods)) {
-            return [
-                'code' => self::DISPATCH_NOT_ALLOWED,
-                'allowed_methods' => array_unique(array_merge(...$allowedMethods)),
-            ];
+            http_response_code(405);
+            header('Allow: ' . implode(', ', $allowedMethods));
+            return false;
         }
-        return [
-            'code' => self::DISPATCH_NOT_FOUND
-        ];
+        self::dispatchNotFound($requestMethod, $requestUri);
+        return false;
     }
 }

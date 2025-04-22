@@ -43,7 +43,7 @@ Requires PHP 8.1 or newer
 - [Route Groups](#route-groups)
   - [Without prefix](#without-prefix)
 - [Dispatching](#dispatching)
-  - [Return Status Codes](#return-status-codes)
+  - [Fallbacks](#fallbacks)
 - [Troubleshooting](#troubleshooting)
   - [Accessing Routes](#accessing-routes)
 - [Hide Scriptname From URL](#hide-scriptname-from-url)
@@ -70,30 +70,7 @@ Route2::get('/{world?}', function($world = 'World') {
     echo "Hello, $world!";
 });
 
-$status = Route2::dispatch();
-
-if ($status['code'] === Route2::DISPATCH_FOUND) {
-    return;
-}
-
-if ($status['code'] === Route2::DISPATCH_NOT_FOUND) {
-    http_response_code(404);
-    echo <<<HTML
-        <h1>404 Page Not Found</h1> 
-    HTML;
-    return;
-}
-
-if ($status['code'] === Route2::DISPATCH_NOT_ALLOWED) {
-    http_response_code(405);
-    $allowedMethods = implode(',', $status['allowed_methods']);
-    header('Allow: ' . $allowedMethods);
-    echo <<<HTML
-        <h1>405 Method Not Allowed</h1><br>
-        <p>Allowed Methods: $allowedMethods</p>
-        HTML;
-    return;
-}
+Route2::dispatch();
 ```
 
 ### FrankenPHP Worker Mode
@@ -114,30 +91,7 @@ Route2::get('/{world?}', function($world = 'World') {
 });
 
 $handler = static function() {
-    $status = Route2::dispatch();
-
-    if ($status['code'] === Route2::DISPATCH_FOUND) {
-        return;
-    }
-
-    if ($status['code'] === Route2::DISPATCH_NOT_FOUND) {
-        http_response_code(404);
-        echo <<<HTML
-            <h1>404 Page Not Found</h1> 
-        HTML;
-        return;
-    }
-
-    if ($status['code'] === Route2::DISPATCH_NOT_ALLOWED) {
-        http_response_code(405);
-        $allowedMethods = implode(',', $status['allowed_methods']);
-        header('Allow: ' . $allowedMethods);
-        echo <<<HTML
-            <h1>405 Method Not Allowed</h1><br>
-            <p>Allowed Methods: $allowedMethods</p>
-            HTML;
-        return;
-    }
+    Route2::dispatch();
 };
 
 while (frankenphp_handle_request($handler)) {
@@ -324,37 +278,33 @@ Route2::group(callback: function () {
 
 A URI is dispatched by calling the `dispatch()` method. This method accepts an HTTP method and a URI. If none are provided it uses the `$_SERVER['REQUEST_METHOD']` and internal `getRelativeRequestUri()` method which returns the relative URI of the current HTTP request. (e.g., `/folder/index.php/myroute` → `/myroute`)
 
-### Return Status Codes
+**Note**: As with all other methods, fallbacks have to be defined before the `dispatch()` method is called.
 
-The `dispatch()` method returns an array with a status code that is either `Route2::DISPATCH_FOUND`, `Route2::DISPATCH_NOT_FOUND` or `Route2::DISPATCH_NOT_ALLOWED`.
+### Fallbacks
 
->**Note**: The HTTP specification requires that a `405 Method Not Allowed` response to include the `Allow:` header to detail available methods for the requested resource. Applications should use the `allowed_methods` array key to add this header when relaying a 405 response.
+Using the `fallback()` method, you may define a function that will be executed when no other route matches the incoming request.
 
 ```php
-$status = Route2::dispatch();
-
-if ($status['code'] === Route2::DISPATCH_FOUND) {
-    return;
-}
-
-if ($status['code'] === Route2::DISPATCH_NOT_FOUND) {
-    http_response_code(404);
+Route2::fallback(callback: function() {
     echo <<<HTML
-        <h1>404 Page Not Found</h1> 
+        <h1>Page not found</h1>
     HTML;
-    return;
-}
+});
+```
 
-if ($status['code'] === Route2::DISPATCH_NOT_ALLOWED) {
-    http_response_code(405);
-    $allowedMethods = implode(',', $status['allowed_methods']);
-    header('Allow: ' . $allowedMethods);
-    echo <<<HTML
-        <h1>405 Method Not Allowed</h1><br>
-        <p>Allowed Methods: $allowedMethods</p>
-        HTML;
-    return;
-}
+You can define a fallback with an optional prefix, ensuring it only triggers when the requested URI begins with the specified prefix. If used within a prefixed group, the group prefix will be applied by default unless another prefix is explicitly provided.
+
+```php
+Route2::fallback('/api', function() {
+    echo json_encode('page not found');
+});
+
+// This also works...
+Route2::group('/api', function() {
+    Route2::fallback(callback: function() {
+        echo json_encode('page not found');
+    });
+});
 ```
 
 ## Troubleshooting
@@ -398,7 +348,7 @@ RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
 
 ## Performance
 
-It's usually not the router that is the bottleneck of an application, hopefully, and while not primarily designed for performance, this router incorporates optimizations in key areas.
+It's usually not the router that is the bottleneck of an application, hopefully. This router incorporates optimizations in key areas.
 
 ### Enable Route Cache
 
@@ -418,7 +368,7 @@ Route2::fromCache(
 
 ### Benchmarks
 
-This test was done using FrankenPHP and `wrk` on a Windows 11 machine running in WSL with an Intel® Core™ i5-12400 Processor from 2022.
+This test was done using FrankenPHP and `wrk` on a Windows 11 machine in WSL with an Intel Core i5-12400 Processor.
 
 
 | Benchmark | Routes| Average Latency | Requests Per Second
