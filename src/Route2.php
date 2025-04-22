@@ -14,6 +14,13 @@ use OutOfBoundsException;
 class Route2
 {
     /**
+     * Route dispatch return status constants.
+     */
+    const DISPATCH_NOT_FOUND = 0;
+    const DISPATCH_FOUND = 1;
+    const DISPATCH_NOT_ALLOWED = 2;
+
+    /**
      * Route tree structure.
      * 
      * The tree is structured as follows:
@@ -22,7 +29,7 @@ class Route2
      *  - (int) "1337": An array of route identifiers.
      *  - Other segments as keys for further nesting.
      */
-    static array $routeTree = [];
+    private static array $routeTree = [];
 
     /**
      * Route creation context.
@@ -41,14 +48,14 @@ class Route2
      *  - `middleware`: An array of middleware functions to execute.
      *  - `expression`: An array of parameter expressions for validation.
      */
-    static array $routeAttributes = [];
+    private static array $routeAttributes = [];
 
     /**
      * Route cache properties.
      */
-    static bool $cacheEnabled = false;
-    static bool $cacheGenerate = false;
-    static string $cacheFilepath;
+    private static bool $cacheEnabled = false;
+    private static bool $cacheGenerate = false;
+    private static string $cacheFilepath;
 
     /**
      * Loads and stores the route tree in a file for faster startup time.
@@ -366,9 +373,11 @@ class Route2
      * @param string|null $requestMethod The HTTP method of the request (e.g., GET, POST). If not provided, it will use the current request method.
      * @param string|null $requestUri    The URI of the request. If not provided, it will use the current relative request URI.
      *
-     * @return bool True if a route was matched and dispatched, false otherwise.
+     * @return array Returns an array containing the status code and allowed methods if applicable.
+     *               - 'code': The status code (e.g., FOUND, NOT_FOUND, METHOD_NOT_ALLOWED).
+     *               - 'allowed_methods': An array of allowed HTTP methods if the method is not allowed.
      */
-    public static function dispatch(?string $requestMethod = null, ?string $requestUri = null): bool
+    public static function dispatch(?string $requestMethod = null, ?string $requestUri = null): array
     {
         $requestMethod = strtoupper(
             $requestMethod ?? $_SERVER['REQUEST_METHOD']
@@ -384,15 +393,11 @@ class Route2
             );
         }
 
+        $allowedMethods = [];
         $routes = self::matchRoute($requestUri);
 
         foreach ($routes as $route) {
-
             [$routeMethods, $routeUri] = explode(' ', $route, 2);
-
-            if (!in_array($requestMethod, explode('|', $routeMethods))) {
-                continue;
-            }
 
             $routePattern = preg_replace(
                 ['/\{(\w+)\}/', '/\{(\w+)\?\}/', '/\{(\w+)\*\}/'],
@@ -402,10 +407,6 @@ class Route2
             $routePattern = '#^' . $routePattern . '$#';
             if (!preg_match($routePattern, $requestUri, $matches)) {
                 continue;
-            }
-
-            if (!isset(self::$routeAttributes[$route])) {
-                throw new OutOfBoundsException("Failed to fetch route attributes for '{$route}'. Maybe try rebuilding the route cache?");
             }
 
             foreach ($matches as $key => $value) {
@@ -430,6 +431,17 @@ class Route2
                     );
                 }
             }
+            
+            $routeMethods = explode('|', $routeMethods);
+            $allowedMethods[] = $routeMethods;
+            if (!in_array($requestMethod, $routeMethods)) {
+                continue;
+            }
+
+            if (!isset(self::$routeAttributes[$route])) {
+                throw new OutOfBoundsException("Failed to fetch route attributes for '{$route}'. Maybe try rebuilding the route cache?");
+            }
+
             foreach (self::$routeAttributes[$route]['middleware']['before'] ?? [] as $middleware) {
                 $middleware();
             }
@@ -437,8 +449,19 @@ class Route2
             foreach (self::$routeAttributes[$route]['middleware']['after'] ?? [] as $middleware) {
                 $middleware();
             }
-            return true;
+            return [
+                'code' => self::DISPATCH_FOUND
+            ];
         }
-        return false;
+
+        if (!empty($allowedMethods)) {
+            return [
+                'code' => self::DISPATCH_NOT_ALLOWED,
+                'allowed_methods' => array_unique(array_merge(...$allowedMethods)),
+            ];
+        }
+        return [
+            'code' => self::DISPATCH_NOT_FOUND
+        ];
     }
 }

@@ -3,11 +3,11 @@
 A simple routing library for PHP web applications.
 
 ### Features:
-- 🌟 **Parameters**: Flexible routing with required, optional and wildcard parameters.
-- 🔍 **Constraints**: Use regex or custom functions for parameter constraints.
-- 🛡️ **Middleware**: Execute logic before and after route handling.
-- 🗂️ **Grouping**: Organize routes with shared functionality for cleaner code.
-- 🪶 **Lightweight**: A single-file, no-frills dependency-free routing solution.
+- **Parameters**: Flexible routing with required, optional and wildcard parameters.
+- **Constraints**: Use regex or custom functions as parameter constraints.
+- **Middleware**: Execute logic before and after route handling.
+- **Grouping**: Organize routes with shared functionality for cleaner code.
+- **Lightweight**: A single-file, no-frills dependency-free routing solution.
 
 ## Install
 
@@ -24,33 +24,6 @@ require '/path/to/Route2.php'
 Requires PHP 8.1 or newer
 
 ---
-
-- [Usage](#usage)
-  - [FrankenPHP Worker Mode](#frankenphp-worker-mode)
-- [Basic Routing](#basic-routing)
-  - [Available Methods](#available-methods)
-  - [Multiple HTTP-verbs](#multiple-http-verbs)
-- [Route Parameters](#route-parameters)
-  - [Required Parameters](#required-parameters)
-  - [Optional Parameters](#optional-parameters)
-  - [Wildcard Parameters](#wildcard-parameters)
-  - [Parameter Constraints](#parameter-constraints)
-  - [Global Constraints](#global-constraints)
-- [Middleware](#middleware)
-  - [Registering Middleware](#registering-middleware)
-- [Route Groups](#route-groups)
-  - [Without prefix](#without-prefix)
-- [Troubleshooting](#troubleshooting)
-  - [Dispatching](#dispatching)
-  - [Accessing Routes](#accessing-routes)
-- [Hide Scriptname From Url](#hide-scriptname-from-url)
-  - [FrankenPHP](#frankenphp)
-  - [NGINX](#nginx)
-  - [Apache](#apache)
-- [Performance](#performance)
-  - [Enable Route Cache](#enable-route-cache)
-  - [Benchmarks](#benchmarks)
-- [License](#license)
 
 ## Usage
 
@@ -125,7 +98,7 @@ Route2::options($uri, $callback);
 
 ### Multiple HTTP-verbs
 
-Sometimes you may need to register a route that responds to multiple HTTP-verbs. You may do so using the match method. Or, you may even register a route that responds to all HTTP verbs using the any method:
+Sometimes you may need to register a route that responds to multiple HTTP-verbs. You may do so using the `match()` method. Or, you may even register a route that responds to all HTTP verbs using the `any()` method:
 
 ```php
 Route2::match('get|post', '/', function() {
@@ -146,7 +119,7 @@ Route2::any('/', function() {
 
 Sometimes you will need to capture segments of the URI within your route. For example, you may need to capture a user's ID from the URL. You may do so by defining route parameters:
 
-**Note**: Parameters must start and end with forward slashes (e.g., `/{param}/`). Arguments injected into the controller will always be of type string.
+>**Note**: Parameters must be enclosed in forward slashes (e.g., `/{param}/`) and are always passed as strings to the controller.
 
 You may define as many route parameters as required by your route:
 
@@ -170,7 +143,7 @@ Route2::get('/user/{id}', function ($id) {
 
 Specify a route parameter that may not always be present in the URI. You may do so by placing a `?` mark after the parameter name.
 
-**Note**: Make sure to give the route's corresponding variable a default value:
+>**Note**: Make sure to give the route's corresponding variable a default value:
 
 ```php
 Route2::get('/user/{name?}', function (string $name = 'John') {
@@ -182,7 +155,7 @@ Route2::get('/user/{name?}', function (string $name = 'John') {
 
 Capture the whole segment including slashes by placing a `*` after the parameter name.
 
-**Note**: Make sure to give the route's corresponding variable a default value:
+>**Note**: Make sure to give the route's corresponding variable a default value:
 
 ```php
 Route2::get('/somewhere/{any*}', function ($any = 'Empty') {
@@ -206,7 +179,7 @@ Route2::get('/user/{id}', function ($id) {
 
 ### Global Constraints
 
-If you would like a route parameter to always be constrained by a given expression, you may use the `expression` method. Routes added after this method will inherit the expression constraints.
+If you would like a route parameter to always be constrained by a given expression, you may use the `expression()` method. Routes added after this method will inherit the expression constraints.
 
 ```php
 Route2::expression([
@@ -222,11 +195,11 @@ Route2::get('/user/{id}', function ($id) {
 
 Middleware inspect and filter HTTP requests entering your application. For instance, authentication middleware can redirect unauthenticated users to a login screen, while allowing authenticated users to proceed. Middleware can also handle tasks like logging incoming requests.
 
-**Note**: Middleware only run if a route is found.
+>**Note**: Middleware only run if a route is found.
 
 ### Registering Middleware
 
-You may register middleware by using the `before` and `after` methods. Routes added after this method call will inherit the middleware. You may also assign a middleware to a specific route by using the named argument `middleware`:
+You may register middleware by using the `before()` and `after()` methods. Routes added after this method call will inherit the middleware. You may also assign a middleware to a specific route by using the named argument `middleware`:
 
 ```php
 // Runs before the route callback
@@ -275,19 +248,38 @@ Route2::group(callback: function () {
 });
 ```
 
-## Troubleshooting
+## Dispatching
 
-### Dispatching
+A URI is dispatched by calling the `dispatch()` method. This method accepts an HTTP method and a URI. If none are provided it uses the `$_SERVER['REQUEST_METHOD']` and internal `getRelativeRequestUri()` method which returns the relative URI of the current HTTP request. (e.g., `/folder/index.php/myroute` → `/myroute`)
 
-When adding routes they are not going to be executed. To perform the routing call the `dispatch` method.
+### Status Codes
+
+The `dispatch()` method returns an array with a status code that is either `Route2::DISPATCH_FOUND`, `Route2::DISPATCH_NOT_FOUND` or `Route2::DISPATCH_NOT_ALLOWED`.
+
+>**Note**: The HTTP specification requires that a `405 Method Not Allowed` response to include the `Allow:` header to detail available methods for the requested resource. Applications should use the `allowed_methods` array key to add this header when relaying a 405 response.
 
 ```php
-// Dispatch the request
-if (!Route2::dispatch()) {
+$status = Route2::dispatch();
+
+if ($status['code'] === Route2::DISPATCH_FOUND) {
+    return;
+}
+
+if ($status['code'] === Route2::DISPATCH_NOT_FOUND) {
     http_response_code(404);
-    echo "404 Not Found";
+    echo '404 Not Found';
+    return;
+}
+
+if ($status['code'] === Route2::DISPATCH_NOT_ALLOWED) {
+    http_response_code(405);
+    header('Allow: ' . implode(', ', $status['allowed_methods']));
+    echo '405 Method Not Allowed';
+    return;
 }
 ```
+
+## Troubleshooting
 
 ### Accessing Routes
 
@@ -328,9 +320,11 @@ RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
 
 ## Performance
 
+It's usually not the router that is the bottleneck of an application, hopefully, and while not primarily designed for performance, this router incorporates optimizations in key areas.
+
 ### Enable Route Cache
 
-To optimize route lookups, this router uses a tree-based algorithm. However, regenerating the tree for every request slows down performance. To improve application boot times, you can enable route tree caching. Simply invoke the `fromCache` method before defining any routes in your application.
+To optimize route lookups, this router uses a tree-based algorithm. However, regenerating the tree for every request slows down performance. To improve application boot times, you can enable route tree caching. Simply invoke the `fromCache()` method before defining any routes in your application.
 
 The named argument `expire` can be set to an integer representing how many seconds till the cache gets invalidated and rebuilt again.
 
