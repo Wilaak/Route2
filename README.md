@@ -278,7 +278,7 @@ Route2::group(callback: function () {
 
 A URI is dispatched by calling the `dispatch()` method. This method accepts an HTTP method and a URI. If none are provided it uses the `$_SERVER['REQUEST_METHOD']` and internal `getRelativeRequestUri()` method which returns the relative URI of the current HTTP request. (e.g., `/folder/index.php/myroute` → `/myroute`)
 
-**Note**: As with all other methods, fallbacks have to be defined before the `dispatch()` method is called.
+>**Note**: As with all other methods, fallbacks have to be defined before the `dispatch()` method is called.
 
 ### Fallbacks
 
