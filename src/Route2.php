@@ -471,7 +471,7 @@ class Route2
             }
             
             $routeMethods = explode('|', $routeMethods);
-            $allowedMethods += $routeMethods;
+            array_push($allowedMethods, ...$routeMethods);
             if (!in_array($requestMethod, $routeMethods)) {
                 continue;
             }
