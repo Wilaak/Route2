@@ -429,6 +429,7 @@ class Route2
                 self::$cacheFilepath,
                 '<?php return ' . var_export(self::$routeTree, true) . ';'
             );
+            self::$cacheGenerate = false;
         }
 
         $allowedMethods = [];
