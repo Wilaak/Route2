@@ -16,8 +16,11 @@ class Route2
     /**
      * An array to store fallback routes.
      * This is used to define fallback mechanisms for routing when no specific route matches a request.
-     *
-     * @var array
+     * 
+     * The array is structured as follows:
+     * - Each key is a prefix (e.g., "/api") that will be used to match the beginning of the request URI.
+     * - Each value is a callable function that will be executed when the fallback is triggered.
+     * - The callable function should accept the request method and URI as parameters.
      */
     private static array $fallbacks = [];
 
