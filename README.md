@@ -352,7 +352,7 @@ RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
 
 ## Performance
 
-It's usually not the router that is the bottleneck of an application, hopefully. This router incorporates optimizations in key areas.
+It's usually not the router that is the bottleneck of an application, hopefully.
 
 ### Enable Route Cache
 
