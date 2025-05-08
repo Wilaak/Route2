@@ -310,7 +310,7 @@ class Route2
                 throw new InvalidArgumentException("Expression for parameter '{$param}' must be a regex string or a callable function");
             }
         }
-        self::$expressionStack[] = $expression;
+        self::$expressionStack += $expression;
     }
 
     /**
