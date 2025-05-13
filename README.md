@@ -52,15 +52,20 @@ Requires PHP 8.1 or newer
   - [Wildcard Parameters](#wildcard-parameters)
   - [Parameter Expressions](#parameter-expressions)
 - [Middleware](#middleware)
-  - [Registering Middleware](#registering-middleware)
+  - [How to Register Middleware](#how-to-register-middleware)
 - [Route Groups](#route-groups)
   - [Without prefix](#without-prefix)
 - [Dispatching](#dispatching)
   - [Fallbacks](#fallbacks)
   - [Accessing Routes](#accessing-routes)
 - [Hooks](#hooks)
-  - [Registering Hooks](#registering-hooks)
-  - [Available Hooks](#available-hooks)
+    - [How to Register Hooks](#how-to-register-hooks)
+    - [Available Hooks](#available-hooks)
+        - [`routeFound`](#routefound)
+        - [`invokeMiddleware`](#invokemiddleware)
+        - [`invokeController`](#invokecontroller)
+        - [`methodNotAllowed`](#methodnotallowed)
+        - [`routeNotFound`](#routenotfound)
 - [Hide Scriptname From URL](#hide-scriptname-from-url)
   - [FrankenPHP](#frankenphp)
   - [NGINX](#nginx)
@@ -242,7 +247,7 @@ Middleware inspect and filter HTTP requests entering your application. You can i
 
 >**Note**: Middleware only run if a route is found.
 
-### Registering Middleware
+### How to Register Middleware 
 
 You may register a middleware by using the `before()` and `after()` methods. Routes added after this method call will inherit the middleware. You may also assign a middleware to a specific route by using the named arguments `before` and `after`:
 
@@ -354,7 +359,7 @@ For example if you request ```http://your.site/yourscript.php/your/route``` it w
 
 Hooks allow you to execute custom logic at various points in the router's lifecycle. Use them to implement features like logging, dependency injection, or performance monitoring. By leveraging hooks, you gain fine-grained control and flexibility over your application's routing behavior.
 
-### Registering Hooks
+### How to Register Hooks
 
 To register a callback for a specific event, you may use the `hook()` method:
 
@@ -366,9 +371,7 @@ Route2::hook('eventName', function (...$args) {
 
 ### Available Hooks
 
-Below are the built-in hooks you can use to extend or customize Route2's behavior. Each hook provides contextual arguments for advanced use cases.
-
----
+Below are the built-in hooks you can use to extend or customize the router behavior.
 
 #### `routeFound`
 - **When:** A route is successfully matched.
@@ -410,17 +413,17 @@ Below are the built-in hooks you can use to extend or customize Route2's behavio
     - `string $requestUri` — The requested URI.
     - `callable $fallback` — The fallback handler for unmatched routes.
 
-## Hide Scriptname From URL
+## Hide Script Name from URL
 
-Want to hide that pesky script name (e.g., `index.php`) from the URL?
+Want to remove the script name (like `index.php`) from your URLs for cleaner, more user-friendly links? Here’s how you can achieve this with different web servers:
 
 ### FrankenPHP
 
-In [FrankenPHP](https://frankenphp.dev); the modern PHP app server. This behavior is enabled by default for `index.php`
+[FrankenPHP](https://frankenphp.dev), the modern PHP app server, hides `index.php` from URLs by default. No extra configuration is needed—just enjoy clean URLs out of the box!
 
 ### NGINX
 
-With PHP already installed and configured you may add this to the server block of your configuration to make requests that don't match a file on your server to be redirected to `index.php`
+To hide `index.php` in NGINX, add the following to your server block. This configuration ensures that requests not matching an existing file or directory are routed to `index.php`:
 
 ```nginx
 location / {
@@ -430,12 +433,10 @@ location / {
 
 ### Apache
 
-Make sure that mod_rewrite is installed on Apache. On a unix system you can just do `a2enmod rewrite`
-
-This snippet in your .htaccess will ensure that all requests for files and folders that does not exists will be redirected to `index.php`
+First, ensure `mod_rewrite` is enabled (on Unix: `a2enmod rewrite`). Then, add this snippet to your `.htaccess` file. It will redirect all requests for non-existent files or directories to `index.php`:
 
 ```apache
-RewriteEngine on
+RewriteEngine On
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
