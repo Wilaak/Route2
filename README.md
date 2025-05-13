@@ -334,7 +334,6 @@ This router provides an event system that allows you to hook into various stages
 To register a callback for a specific event, use the `hook()` method:
 
 ```PHP
-<?php
 Route2::hook('eventName', function (...$args) {
     // Your custom logic here
 });
