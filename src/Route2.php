@@ -14,12 +14,11 @@ use OutOfBoundsException;
 class Route2
 {
     /**
-     * An array to store fallback routes.
-     * This is used to define fallback mechanisms for routing when no specific route matches a request.
+     * An array to store fallbacks.
      * 
      * The array is structured as follows:
      * - Each key is a prefix (e.g., "/api") that will be used to match the beginning of the request URI.
-     * - Each value is a callable function that will be executed when the fallback is triggered.
+     * - Each value is a callback that will be executed when the fallback is triggered.
      * - The callable function should accept the request method and URI as parameters.
      */
     private static array $fallbacks = [];
@@ -37,6 +36,11 @@ class Route2
 
     /**
      * Route creation context.
+     * 
+     * The context is used to store the current state of the route creation process.
+     * - `$routeGroupPrefix`: The prefix to be applied to all routes in the group.
+     * - `$middlewareStack`: An array of middleware functions to be executed before and after the controller.
+     * - `$expressionStack`: An array of parameter expressions for validation.
      */
     private static string $routeGroupPrefix = '';
     private static array $middlewareStack = [];
@@ -62,8 +66,48 @@ class Route2
     private static string $cacheFilepath;
 
     /**
+     * Event hooks for the router lifecycle.
+     *
+     * The hooks are structured as follows:
+     * - Each key is an event name (e.g., 'onDispatchStart', 'onRouteMatch').
+     * - Each value is an array of callable functions to be executed for that event.
+     */
+    private static array $hooks = [];
+
+    /**
+     * Registers a callback for a specific event hook.
+     *
+     * @param string   $event    The name of the event (e.g., 'onDispatchStart', 'onRouteMatch').
+     * @param callable $callback The callback function to register.
+     *
+     * @return void
+     */
+    public static function hook(string $event, callable $callback): void
+    {
+        self::$hooks[$event][] = $callback;
+    }
+
+    /**
+     * Triggers all callbacks for a specific event.
+     *
+     * @param string $event The name of the event to trigger.
+     * @param mixed  ...$args Arguments to pass to the callback functions.
+     *
+     * @return bool Returns true if the hook exists and was triggered, false otherwise.
+     */
+    private static function trigger(string $event, ...$args): bool
+    {
+        if (!isset(self::$hooks[$event])) {
+            return false;
+        }
+        foreach (self::$hooks[$event] as $callback) {
+            $callback(...$args);
+        }
+        return true;
+    }
+
+    /**
      * Sets a fallback function to be executed when no route matches.
-     * 
      * 
      * @param string|null   $prefix   Optional prefix to be applied to the fallback route.
      * @param callable|null $callback The fallback function to execute.
@@ -84,30 +128,28 @@ class Route2
     }
 
     /**
-     * Handles the 404 Not Found response.
-     * 
      * This method is called when a requested route is not found under `dispatch()`.
+     * 
+     * @param string $requestUri    The URI of the request.
+     * 
+     * @return callable|null Returns the fallback function if found, null otherwise.
      */
-    private static function dispatchNotFound(string $requestMethod, string $requestUri): void
+    private static function getFallback(string $requestUri): ?callable 
     {
-        http_response_code(404);
         foreach (self::$fallbacks as $prefix => $callback) {
-           if (str_starts_with($requestUri, $prefix)) {
-               $callback($requestMethod, $requestUri);
-               return;
-           }
+            if (str_starts_with($requestUri, $prefix)) {
+                return $callback;
+            }
         }
-        echo '404 Not Found';
+        return null;
     }
 
     /**
-     * Loads and stores the route tree in a file for faster startup time.
-     *
+     * Loads and caches the route tree in a file for faster startup.
+     * 
      * @param bool      $enabled  Whether to enable caching.
      * @param int|false $expire   The cache expiration time in seconds. If false, the cache never expires.
      * @param string    $filepath The path to the cache file.
-     *
-     * @throws InvalidArgumentException If route caching is enabled after routes have been defined.
      */
     public static function fromCache(bool $enabled = true, int|false $expire = false, string $filepath = 'Route2.cache.php'): void
     {
@@ -136,27 +178,28 @@ class Route2
     }
 
     /**
-     * Adds a new route to the routing tree.
+     * Registers a new route in the routing tree.
      *
-     * @param string        $methods     A pipe-separated list of HTTP methods (e.g., "GET|POST").
-     * @param string        $uri         The URL pattern for the route. 
-     *                                   Supports:
-     *                                   - Required parameters `{param}`.
-     *                                   - Optional parameters `{param?}`.
-     *                                   - Wildcard parameters `{param*}` (matches everything after the parameter).
-     * @param callable      $controller  The controller function to handle the route.
-     * @param callable|null $middleware  Optional middleware to execute before the controller.
-     * @param array         $expression  Optional parameter expressions:
-     *                                   - An associative array where:
-     *                                     - The key is the parameter name.
-     *                                     - The value is either:
-     *                                       - A regex string (e.g., `['id' => '[0-9]+']` to match numbers).
-     *                                       - A function that validates the parameter 
-     *                                         (e.g., `['id' => is_numeric(...)]`).
+     * @param string              $methods     A pipe-separated list of HTTP methods (e.g., "GET|POST").
+     * @param string              $uri         The URL pattern for the route. 
+     *                                         Supports:
+     *                                         - Required parameters `{param}`.
+     *                                         - Optional parameters `{param?}`.
+     *                                         - Wildcard parameters `{param*}` (matches everything after the parameter).
+     * @param callable            $controller  The controller function to handle the route.
+     * @param callable|array|null $before      Optional middleware to execute before the controller.
+     * @param callable|array|null $after       Optional middleware to execute after the controller.
+     * @param array               $expression  Optional parameter expressions:
+     *                                         - An associative array where:
+     *                                           - The key is the parameter name.
+     *                                           - The value is either:
+     *                                             - A regex string (e.g., `['id' => '[0-9]+']` to match numbers).
+     *                                             - A function that validates the parameter 
+     *                                               (e.g., `['id' => is_numeric(...)]`).
      *
      * @return void
      */
-    public static function match(string $methods, string $uri, callable $controller, ?callable $middleware = null, array $expression = []): void
+    public static function match(string $methods, string $uri, callable $controller, null|callable|array $before = null, null|callable|array $after = null, array $expression = []): void
     {
         $methods = strtoupper(
             str_replace(' ', '', $methods)
@@ -168,8 +211,25 @@ class Route2
         }
 
         $middlewareStack = self::$middlewareStack;
-        if ($middleware !== null) {
-            $middlewareStack['before'][] = $middleware;
+        foreach (['before' => $before, 'after' => $after] as $key => $middleware) {
+            if ($middleware !== null) {
+                $middleware = is_array($middleware) ? $middleware : [$middleware];
+                foreach ($middleware as $mw) {
+                    if (!is_callable($mw)) {
+                        throw new InvalidArgumentException('Each middleware must be a callable.');
+                    }
+                }
+                $middlewareStack[$key] = array_merge(
+                    $middlewareStack[$key] ?? [],
+                    $middleware
+                );
+            }
+        }
+
+        foreach ($expression as $param => $regex) {
+            if (!is_string($regex) && !is_callable($regex)) {
+                throw new InvalidArgumentException("Expression for parameter '{$param}' must be a regex string or a callable function");
+            }
         }
 
         self::$routeAttributes[$identifier] = [
@@ -194,103 +254,95 @@ class Route2
         $currentNode[1337][] = $identifier;
     }
 
-    /**
-     * Shorthand for `Route2::match('GET', ...)`
-     */
-    public static function get(string $uri, callable $controller, ?callable $middleware = null, array $expression = []): void
+    /** Shorthand for `Route2::match('GET', ...)` */
+    public static function get(string $uri, callable $controller, null|callable|array $before = null, null|callable|array $after = null, array $expression = []): void
     {
-        self::match('GET', $uri, $controller, $middleware, $expression);
+        self::match('GET', $uri, $controller, $before, $after, $expression);
+    }
+    /** Shorthand for `Route2::match('POST', ...)` */
+    public static function post(string $uri, callable $controller, null|callable|array $before = null, null|callable|array $after = null, array $expression = []): void
+    {
+        self::match('POST', $uri, $controller, $before, $after, $expression);
+    }
+    /** Shorthand for `Route2::match('PUT', ...)` */
+    public static function put(string $uri, callable $controller, null|callable|array $before = null, null|callable|array $after = null, array $expression = []): void
+    {
+        self::match('PUT', $uri, $controller, $before, $after, $expression);
+    }
+    /** Shorthand for `Route2::match('DELETE', ...)` */
+    public static function delete(string $uri, callable $controller, null|callable|array $before = null, null|callable|array $after = null, array $expression = []): void
+    {
+        self::match('DELETE', $uri, $controller, $before, $after, $expression);
+    }
+    /** Shorthand for `Route2::match('PATCH', ...)` */
+    public static function patch(string $uri, callable $controller, null|callable|array $before = null, null|callable|array $after = null, array $expression = []): void
+    {
+        self::match('PATCH', $uri, $controller, $before, $after, $expression);
+    }
+    /** Shorthand for `Route2::match('OPTIONS', ...)` */
+    public static function options(string $uri, callable $controller, null|callable|array $before = null, null|callable|array $after = null, array $expression = []): void
+    {
+        self::match('OPTIONS', $uri, $controller, $before, $after, $expression);
+    }
+    /** Shorthand for `Route2::match('GET|POST', ...)` */
+    public static function form(string $uri, callable $controller, null|callable|array $before = null, null|callable|array $after = null, array $expression = []): void
+    {
+        self::match('GET|POST', $uri, $controller, $before, $after, $expression);
+    }
+    /** Shorthand for `Route2::match('GET|POST|PUT|DELETE|PATCH|OPTIONS', ...)` */
+    public static function any(string $uri, callable $controller, null|callable|array $before = null, null|callable|array $after = null, array $expression = []): void
+    {
+        self::match('GET|POST|PUT|DELETE|PATCH|OPTIONS', $uri, $controller, $before, $after, $expression);
     }
 
     /**
-     * Shorthand for `Route2::match('POST', ...)`
-     */
-    public static function post(string $uri, callable $controller, ?callable $middleware = null, array $expression = []): void
-    {
-        self::match('POST', $uri, $controller, $middleware, $expression);
-    }
-
-    /**
-     * Shorthand for `Route2::match('PUT', ...)`
-     */
-    public static function put(string $uri, callable $controller, ?callable $middleware = null, array $expression = []): void
-    {
-        self::match('PUT', $uri, $controller, $middleware, $expression);
-    }
-
-    /**
-     * Shorthand for `Route2::match('DELETE', ...)`
-     */
-    public static function delete(string $uri, callable $controller, ?callable $middleware = null, array $expression = []): void
-    {
-        self::match('DELETE', $uri, $controller, $middleware, $expression);
-    }
-
-    /**
-     * Shorthand for `Route2::match('PATCH', ...)`
-     */
-    public static function patch(string $uri, callable $controller, ?callable $middleware = null, array $expression = []): void
-    {
-        self::match('PATCH', $uri, $controller, $middleware, $expression);
-    }
-
-    /**
-     * Shorthand for `Route2::match('OPTIONS', ...)`
-     */
-    public static function options(string $uri, callable $controller, ?callable $middleware = null, array $expression = []): void
-    {
-        self::match('OPTIONS', $uri, $controller, $middleware, $expression);
-    }
-
-    /**
-     * Shorthand for `Route2::match('GET|POST', ...)`
-     */
-    public static function form(string $uri, callable $controller, ?callable $middleware = null, array $expression = []): void
-    {
-        self::match('GET|POST', $uri, $controller, $middleware, $expression);
-    }
-
-    /**
-     * Shorthand for `Route2::match('GET|POST|PUT|DELETE|PATCH|OPTIONS', ...)`
-     */
-    public static function any(string $uri, callable $controller, ?callable $middleware = null, array $expression = []): void
-    {
-        self::match('GET|POST|PUT|DELETE|PATCH|OPTIONS', $uri, $controller, $middleware, $expression);
-    }
-
-    /**
-     * Adds a middleware to the "before" middleware stack.
-     *
+     * Adds middleware to the "before" middleware stack.
      * Routes added after this method call will inherit the middleware.
      *
-     * @param callable $middleware The middleware to add to the "before" stack.
-     *                             It should be a callable function or method.
+     * @param callable|array $middleware The middleware to add to the "before" stack.
+     *                                   It can be a callable function/method or an array of callables.
      *
      * @return void
      */
-    public static function before(callable $middleware): void
+    public static function before(callable|array $middleware): void
     {
-        self::$middlewareStack['before'][] = $middleware;
+        if (is_array($middleware)) {
+            foreach ($middleware as $mw) {
+                if (!is_callable($mw)) {
+                    throw new InvalidArgumentException('Each middleware must be a callable.');
+                }
+                self::$middlewareStack['before'][] = $mw;
+            }
+        } else {
+            self::$middlewareStack['before'][] = $middleware;
+        }
     }
 
     /**
-     * Adds a middleware to the "after" middleware stack.
-     * 
+     * Adds middleware to the "after" middleware stack.
      * Routes added after this method call will inherit the middleware.
      * 
-     * @param callable $middleware The middleware to add to the "after" stack.
-     *                             It should be a callable function or method.
+     * @param callable|array $middleware The middleware to add to the "after" stack.
+     *                                   It can be a callable function/method or an array of callables.
      * 
      * @return void
      */
-    public static function after(callable $middleware): void
+    public static function after(callable|array $middleware): void
     {
-        self::$middlewareStack['after'][] = $middleware;
+        if (is_array($middleware)) {
+            foreach ($middleware as $mw) {
+                if (!is_callable($mw)) {
+                    throw new InvalidArgumentException('Each middleware must be a callable.');
+                }
+                self::$middlewareStack['after'][] = $mw;
+            }
+        } else {
+            self::$middlewareStack['after'][] = $middleware;
+        }
     }
 
     /**
      * Adds expressions to the expression stack.
-     *
      * Routes added after this method call will inherit the expression constraints.
      * 
      * @param array $expressions An associative array where:
@@ -300,7 +352,6 @@ class Route2
      *                             - A callable function that validates the parameter
      *                               (e.g., `['id' => is_numeric(...)]`).
      *
-     * @throws InvalidArgumentException If an expression is neither a string nor a callable.
      * @return void
      */
     public static function expression(array $expression): void
@@ -315,7 +366,6 @@ class Route2
 
     /**
      * Share attributes across multiple routes
-     * 
      * Preserves and restores the previous state after the callback.
      * 
      * @param string|null   $prefix   Optional prefix to be applied to all routes in the group.
@@ -339,7 +389,6 @@ class Route2
 
     /**
      * Gets the relative URI of the current HTTP request.
-     *
      * Example:
      * - `/index.php/myroute` → `/myroute`
      *
@@ -366,7 +415,6 @@ class Route2
 
         return $requestUri;
     }
-
 
     /**
      * Matches a route in the tree structure based on the URI.
@@ -427,6 +475,8 @@ class Route2
             strtok($requestUri ?? self::getRelativeRequestUri(), '?')
         );
 
+        self::trigger('onDispatchStart', $requestMethod, $requestUri);
+
         if (self::$cacheGenerate) {
             file_put_contents(
                 self::$cacheFilepath,
@@ -461,19 +511,21 @@ class Route2
                 if (!isset($params[$param])) {
                     continue;
                 }
-                if (is_callable($expression) && !$expression($params[$param])) {
-                    continue 2;
+                if (is_callable($expression)) {
+                    $result = $expression($params[$param]);
+                    if ($result === false) {
+                        continue 2;
+                    }
+                    if ($result === true) {
+                        continue;
+                    }
+                    $params[$param] = $result;
                 }
                 if (is_string($expression) && !preg_match('#^' . $expression . '$#', $params[$param])) {
                     continue 2;
                 }
-                if (!is_string($expression) && !is_callable($expression)) {
-                    throw new InvalidArgumentException(
-                        "Expression for parameter '{$param}' must be a regex string or callable function"
-                    );
-                }
             }
-            
+
             $routeMethods = explode('|', $routeMethods);
             array_push($allowedMethods, ...$routeMethods);
             if (!in_array($requestMethod, $routeMethods)) {
@@ -484,21 +536,40 @@ class Route2
                 throw new OutOfBoundsException("Failed to fetch route attributes for '{$route}'. Maybe try rebuilding the route cache?");
             }
 
+            self::trigger('onRouteMatch', $requestMethod, $requestUri, $params ?? []);
+
             foreach (self::$routeAttributes[$route]['middleware']['before'] ?? [] as $middleware) {
-                $middleware();
+                if (!self::trigger('onMiddlewareInvoke', $middleware)) {
+                    $middleware();
+                }
             }
-            self::$routeAttributes[$route]['controller'](...$params ?? []);
+            if (!self::trigger('onControllerInvoke', self::$routeAttributes[$route]['controller'], $params ?? [])) {
+                self::$routeAttributes[$route]['controller'](...$params ?? []);
+            }
             foreach (self::$routeAttributes[$route]['middleware']['after'] ?? [] as $middleware) {
-                $middleware();
+                if (!self::trigger('onMiddlewareInvoke', $middleware)) {
+                    $middleware();
+                }
             }
             return true;
         }
         if (!empty($allowedMethods)) {
             http_response_code(405);
             header('Allow: ' . implode(', ', $allowedMethods));
+            if (!self::trigger('onMethodNotAllowed', $requestMethod, $requestUri, $allowedMethods)) {
+                echo '405 Method Not Allowed';
+            }
             return false;
         }
-        self::dispatchNotFound($requestMethod, $requestUri);
+
+        http_response_code(404);
+        $fallback = self::getFallback($requestUri);
+        $fallback = $fallback ?? function() {
+            echo '404 Not Found';
+        };
+        if (!self::trigger('onNotFound', $requestMethod, $requestUri, $fallback)) {
+            $fallback($requestMethod, $requestUri);
+        }
         return false;
     }
 }
