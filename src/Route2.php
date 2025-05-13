@@ -148,10 +148,10 @@ class Route2
      * Loads and caches the route tree in a file for faster startup.
      * 
      * @param bool      $enabled  Whether to enable caching.
-     * @param int|false $expire   The cache expiration time in seconds. If false, the cache never expires.
      * @param string    $filepath The path to the cache file.
+     * @param int|false $expire   The cache expiration time in seconds. If false, the cache never expires.
      */
-    public static function fromCache(bool $enabled = true, int|false $expire = false, string $filepath = 'Route2.cache.php'): void
+    public static function fromCache(bool $enabled = true, string $filepath = 'Route2.cache.php', int|false $expire = false): void
     {
         if ($enabled === false) {
             return;
@@ -475,8 +475,6 @@ class Route2
             strtok($requestUri ?? self::getRelativeRequestUri(), '?')
         );
 
-        self::trigger('onDispatchStart', $requestMethod, $requestUri);
-
         if (self::$cacheGenerate) {
             file_put_contents(
                 self::$cacheFilepath,
@@ -536,18 +534,18 @@ class Route2
                 throw new OutOfBoundsException("Failed to fetch route attributes for '{$route}'. Maybe try rebuilding the route cache?");
             }
 
-            self::trigger('onRouteMatch', $requestMethod, $requestUri, $params ?? []);
+            self::trigger('routeFound', $requestMethod, $requestUri, $params ?? []);
 
             foreach (self::$routeAttributes[$route]['middleware']['before'] ?? [] as $middleware) {
-                if (!self::trigger('onMiddlewareInvoke', $middleware)) {
+                if (!self::trigger('invokeMiddleware', $middleware)) {
                     $middleware();
                 }
             }
-            if (!self::trigger('onControllerInvoke', self::$routeAttributes[$route]['controller'], $params ?? [])) {
+            if (!self::trigger('invokeController', self::$routeAttributes[$route]['controller'], $params ?? [])) {
                 self::$routeAttributes[$route]['controller'](...$params ?? []);
             }
             foreach (self::$routeAttributes[$route]['middleware']['after'] ?? [] as $middleware) {
-                if (!self::trigger('onMiddlewareInvoke', $middleware)) {
+                if (!self::trigger('invokeMiddleware', $middleware)) {
                     $middleware();
                 }
             }
@@ -556,7 +554,7 @@ class Route2
         if (!empty($allowedMethods)) {
             http_response_code(405);
             header('Allow: ' . implode(', ', $allowedMethods));
-            if (!self::trigger('onMethodNotAllowed', $requestMethod, $requestUri, $allowedMethods)) {
+            if (!self::trigger('methodNotAllowed', $requestMethod, $requestUri, $allowedMethods)) {
                 echo '405 Method Not Allowed';
             }
             return false;
@@ -567,7 +565,7 @@ class Route2
         $fallback = $fallback ?? function() {
             echo '404 Not Found';
         };
-        if (!self::trigger('onNotFound', $requestMethod, $requestUri, $fallback)) {
+        if (!self::trigger('routeNotFound', $requestMethod, $requestUri, $fallback)) {
             $fallback($requestMethod, $requestUri);
         }
         return false;

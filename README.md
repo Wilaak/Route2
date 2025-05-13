@@ -2,13 +2,28 @@
 
 A simple routing library for PHP web applications.
 
-### Features:
-- **Parameters**: Flexible routing with required, optional and wildcard parameters.
-- **Constraints**: Use regex or custom functions to validate and intercept parameters.
-- **Middleware**: Execute logic before and after route handling.
-- **Grouping**: Organize routes with shared functionality for cleaner code.
-- **Hooks**: Extend routing functionality for integrating with DI containers, metrics and more.
-- **Lightweight**: A single-file, no-frills, dependency-free routing solution.
+### Features
+
+- **Dynamic Route Parameters** 🧩  
+    Define routes with required, optional, or wildcard parameters for flexible and expressive URL patterns.
+
+- **Advanced Parameter Validation** 🛡️  
+    Enforce and transform route parameters using regular expressions or custom logic for precise control.
+
+- **Comprehensive Middleware Support** 🦺  
+    Integrate middleware before and after route execution for granular request processing and security.
+
+- **Structured Route Grouping** 🗂️  
+    Organize related routes with group functionality, enabling shared attributes and a maintainable structure.
+
+- **Extensible Hook System** 🪝  
+    Customize and extend routing behavior with hooks—ideal for logging, dependency injection, or PSR-7 compatibility.
+
+- **High-Performance Routing** ⚡  
+    Benefit from a tree-based algorithm and optional route caching for fast and efficient route resolution.
+
+- **Lightweight and Dependency-Free** 🪶  
+    Minimal, single-file design with no external dependencies, easy to integrate and maintain.
 
 ## Install
 
@@ -26,7 +41,7 @@ Requires PHP 8.1 or newer
 
 ## Table of Contents
 
-- [Usage](#usage)
+- [Quick Start](#quick-start)
   - [FrankenPHP Worker Mode](#frankenphp-worker-mode)
 - [Basic Routing](#basic-routing)
   - [Available Methods](#available-methods)
@@ -35,7 +50,7 @@ Requires PHP 8.1 or newer
   - [Required Parameters](#required-parameters)
   - [Optional Parameters](#optional-parameters)
   - [Wildcard Parameters](#wildcard-parameters)
-  - [Parameter Constraints](#parameter-constraints)
+  - [Parameter Expressions](#parameter-expressions)
 - [Middleware](#middleware)
   - [Registering Middleware](#registering-middleware)
 - [Route Groups](#route-groups)
@@ -55,7 +70,7 @@ Requires PHP 8.1 or newer
   - [Benchmarks](#benchmarks)
 - [License](#license)
 
-## Usage
+## Quick Start
 
 Here's a basic getting started example:
 
@@ -124,7 +139,7 @@ Route2::options($uri, $callback);
 
 ### Multiple HTTP-verbs
 
-Sometimes you may need to register a route that responds to multiple HTTP-verbs. You may do so using the `match()` method. Or, you may even register a route that responds to all HTTP verbs using the `any()` method:
+Sometimes you need to register a route that responds to multiple HTTP-verbs. You can do so using the `match()` method. Or, you can even register a route that responds to all HTTP verbs using the `any()` method:
 
 ```php
 Route2::match('get|post', '/', function() {
@@ -144,9 +159,9 @@ Route2::any('/', function() {
 
 Sometimes you will need to capture segments of the URI within your route. For example, you may need to capture a user's ID from the URL. You may do so by defining route parameters:
 
->**Note**: Parameters must be enclosed in forward slashes (e.g., `/{param}/`) and may not contain any special characters.
+>**Note**: Parameters must be enclosed in forward slashes (e.g., `/{param}/`) and should not contain any special characters.
 
-You may define as many route parameters as required by your route:
+You can define as many route parameters as required by your route:
 
 ```php
 Route2::get('/posts/{post}/comments/{comment}', function ($post, $comment) {
@@ -188,12 +203,12 @@ Route2::get('/somewhere/{any*}', function ($any = 'Empty') {
 });
 ```
 
-### Parameter Constraints
+### Parameter Expressions 
 
-You can enforce specific formats for your route parameters by using the `expression` named argument. This argument accepts an associative array where the keys represent parameter names, and the values can either be a regex pattern or a function.
+You can enforce specific formats for your route parameters by using the `expression` named argument. This argument accepts an associative array where the keys represent parameter names, and the values can either be a regex pattern or a closure.
 
-- **Regex**: Ensures the parameter matches the specified pattern. If not the route will be skipped.
-- **Function**: The function should return `true` to allow the parameter, `false` to skip the route, or any other value to assign it directly to the parameter.
+- **Regex**: A regex string ensures the parameter matches the specified pattern. If not the route will be skipped.
+- **Closure**: The closure should return `true` to allow the parameter, `false` to skip the route, or any other value to assign it directly to the parameter.
 
 ```php
 Route2::get('/user/{id}', function ($id) {
@@ -209,9 +224,7 @@ Route2::get('/echo/{message}', function($message) {
 }, expression: ['message' => strtoupper(...)]);
 ```
 
-If you would like a route parameter to always be constrained by a given expression, you may use the `expression()` method. Routes added after this method will inherit the expression constraints.
-
->**Note**: Understanding how inheritance operates is essential for grasping the router's behavior and functionality.
+If you would like a route parameter to always be affected by a given expression, you may use the `expression()` method. Routes added after this method will inherit the expression.
 
 ```php
 Route2::expression([
@@ -225,13 +238,13 @@ Route2::get('/user/{id}', function ($id) {
 
 ## Middleware
 
-Middleware inspect and filter HTTP requests entering your application. You can imagine them as a series of functions that your application has to go through before reaching the main function. For instance, authentication middleware can redirect unauthenticated users to a login screen, while allowing authenticated users to proceed. Middleware can also handle tasks like logging incoming requests.
+Middleware inspect and filter HTTP requests entering your application. You can imagine them as a series of layers that your application has to go through before hitting the main part. For instance, authentication middleware can redirect unauthenticated users to a login screen, while allowing authenticated users to proceed.
 
 >**Note**: Middleware only run if a route is found.
 
 ### Registering Middleware
 
-You may register middleware by using the `before()` and `after()` methods. Routes added after this method call will inherit the middleware. You may also assign a middleware to a specific route by using the named argument `before` and `after`:
+You may register a middleware by using the `before()` and `after()` methods. Routes added after this method call will inherit the middleware. You may also assign a middleware to a specific route by using the named arguments `before` and `after`:
 
 ```php
 // Runs before the route callback
@@ -283,8 +296,7 @@ Route2::group(callback: function () {
 ```
 
 ## Dispatching
-
-A URI is dispatched by calling the `dispatch()` method. This method accepts an HTTP method and a URI. If none are provided it uses the `$_SERVER['REQUEST_METHOD']` and internal `getRelativeRequestUri()` method which returns the relative URI of the current HTTP request. (e.g., `/folder/index.php/myroute` → `/myroute`)
+A URI is dispatched using the `dispatch()` method. By default, this method automatically determines the HTTP method and relative URI of the current request, leveraging `$_SERVER['REQUEST_METHOD']` and `$_SERVER['REQUEST_URI']` with the `getRelativeRequestUri()` method. For example, a request to `/folder/index.php/myroute` would resolve to `/myroute`. Alternatively, you can explicitly pass the HTTP method and URI as arguments to the `dispatch()` method.
 
 ```php
 Route2::dispatch();
@@ -292,7 +304,7 @@ Route2::dispatch();
 
 ### Fallbacks
 
->**Note**: Fallbacks do not depend on inheritance, meaning that you may the define them anywhere and they will still apply.
+>**Note**: Fallbacks do not depend on inheritance, meaning that you can the define them anywhere and they will still apply.
 
 Using the `fallback()` method, you may define a function that will be executed when no other route matches the incoming request.
 
@@ -326,12 +338,11 @@ The simplest way to access your routes is to put the file in your folder and run
 For example if you request ```http://your.site/yourscript.php/your/route``` it will automatically adjust to `/your/route`.
 
 ## Hooks
-
-This router provides an event system that allows you to hook into various stages of the router's lifecycle. Examples of use include logging, dependency injection, or performance monitoring.
+Hooks allow you to execute custom logic at various points in the router's lifecycle. Use them to implement features like logging, dependency injection, or performance monitoring. By leveraging hooks, you gain fine-grained control and flexibility over your application's routing behavior.
 
 ### Registering Hooks
 
-To register a callback for a specific event, use the `hook()` method:
+To register a callback for a specific event, you may use the `hook()` method:
 
 ```PHP
 Route2::hook('eventName', function (...$args) {
@@ -341,43 +352,45 @@ Route2::hook('eventName', function (...$args) {
 
 ### Available Hooks
 
-1. **`onDispatchStart`**
-   - **Description**: Triggered at the start of the dispatch process.
-   - **Arguments**:
-     - `$requestMethod` (string): The HTTP method of the request (e.g., `GET`, `POST`).
-     - `$requestUri` (string): The URI of the request.
+#### `routeFound`
+- **Description**: Triggered when a route is successfully matched.
+- **Arguments**:
+    - **`$requestMethod`** *(string)*: The HTTP method of the request.
+    - **`$requestUri`** *(string)*: The URI of the request.
+    - **`$params`** *(array)*: The parameters extracted from the route.
 
-2. **`onRouteMatch`**
-   - **Description**: Triggered when a route is successfully matched.
-   - **Arguments**:
-     - `$requestMethod` (string): The HTTP method of the request.
-     - `$requestUri` (string): The URI of the request.
-     - `$params` (array): The parameters extracted from the route.
+---
 
-3. **`onMiddlewareInvoke`**
-   - **Description**: Triggered before invoking a middleware.
-   - **Arguments**:
-     - `$middleware` (callable): The middleware to be invoked.
+#### `invokeMiddleware`
+- **Description**: Triggered before invoking a middleware.
+- **Arguments**:
+    - **`$middleware`** *(callable)*: The middleware to be invoked.
 
-4. **`onControllerInvoke`**
-   - **Description**: Triggered before invoking the route's controller.
-   - **Arguments**:
-     - `$controller` (callable): The controller to be invoked.
-     - `$params` (array): The parameters to be passed to the controller.
+---
 
-5. **`onMethodNotAllowed`**
-   - **Description**: Triggered when a route is matched, but the HTTP method is not allowed.
-   - **Arguments**:
-     - `$requestMethod` (string): The HTTP method of the request.
-     - `$requestUri` (string): The URI of the request.
-     - `$allowedMethods` (array): The list of allowed HTTP methods for the route.
+#### `invokeController`
+- **Description**: Triggered before invoking the route's controller.
+- **Arguments**:
+    - **`$controller`** *(callable)*: The controller to be invoked.
+    - **`$params`** *(array)*: The parameters to be passed to the controller.
 
-6. **`onNotFound`**
-   - **Description**: Triggered when no route matches the request.
-   - **Arguments**:
-     - `$requestMethod` (string): The HTTP method of the request.
-     - `$requestUri` (string): The URI of the request.
-     - `$fallback` (callable): The fallback function to handle the request.
+---
+
+#### `methodNotAllowed`
+- **Description**: Triggered when a route is matched, but the HTTP method is not allowed.
+- **Arguments**:
+    - **`$requestMethod`** *(string)*: The HTTP method of the request.
+    - **`$requestUri`** *(string)*: The URI of the request.
+    - **`$allowedMethods`** *(array)*: The list of allowed HTTP methods for the route.
+
+---
+
+#### `routeNotFound`
+- **Description**: Triggered when no route matches the request.
+- **Arguments**:
+    - **`$requestMethod`** *(string)*: The HTTP method of the request.
+    - **`$requestUri`** *(string)*: The URI of the request.
+    - **`$fallback`** *(callable)*: The fallback function to handle the request.
 
 ## Hide Scriptname From URL
 
@@ -412,7 +425,7 @@ RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
 
 ## Performance
 
-The router is and should rarely be the bottleneck of an application, hopefully. For most applications, the performance of this router will be more than sufficient. However, if your project demands extreme performance, you might want to explore alternatives like [FastRoute](https://github.com/nikic/FastRoute).
+The router is and should rarely be the bottleneck of an application, hopefully. For most applications, the performance of this router will be more than sufficient.
 
 ### Enable Route Cache
 
@@ -420,7 +433,9 @@ To optimize route lookups, this router uses a tree-based algorithm. However, reg
 
 The named argument `expire` can be set to an integer representing how many seconds till the cache gets invalidated and rebuilt again.
 
->**Caution**: Be careful when specifying the `filepath` as the file may be overwritten or deleted during the caching process.
+>**Note**: Route caching is not necessary in worker mode since the route tree is retained in memory. You may still enable it if you find yourself restarting the workers often.
+
+>**Caution**: Use caution when setting the `filepath`. The specified file may be overwritten or removed during the caching process, so ensure it does not conflict with other important files.
 
 ```php
 Route2::fromCache(
