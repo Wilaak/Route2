@@ -159,7 +159,7 @@ Route2::any('/', function() {
 
 Sometimes you will need to capture segments of the URI within your route. For example, you may need to capture a user's ID from the URL. You may do so by defining route parameters:
 
->**Note**: Parameters must be enclosed in forward slashes (e.g., `/{param}/`) and should not contain any special characters.
+>**Note**: Parameters must be enclosed in forward slashes (e.g., `/{param}/`) and the names must not contain any special characters.
 
 You can define as many route parameters as required by your route:
 
@@ -296,17 +296,27 @@ Route2::group(callback: function () {
 ```
 
 ## Dispatching
-A URI is dispatched using the `dispatch()` method. By default, this method automatically determines the HTTP method and relative URI of the current request, leveraging `$_SERVER['REQUEST_METHOD']` and `$_SERVER['REQUEST_URI']` with the `getRelativeRequestUri()` method. For example, a request to `/folder/index.php/myroute` would resolve to `/myroute`. Alternatively, you can explicitly pass the HTTP method and URI as arguments to the `dispatch()` method.
+
+The `dispatch()` method is responsible for handling incoming requests and matching them to your defined routes.
+
+By default, `dispatch()` automatically detects the HTTP method and the relative URI from the current request, using `$_SERVER['REQUEST_METHOD']` and `$_SERVER['REQUEST_URI']` in combination with the `getRelativeRequestUri()` helper. For example, a request to `/folder/index.php/myroute` will be resolved as `/myroute`.
+
+If you need more control, you can also call `dispatch()` with explicit HTTP method and URI arguments:
 
 ```php
-Route2::dispatch();
+Route2::dispatch('POST', '/custom/route');
 ```
+
+This flexibility allows you to easily test routes or integrate with custom server environments.
+
 
 ### Fallbacks
 
->**Note**: Fallbacks do not depend on inheritance, meaning that you can the define them anywhere and they will still apply.
+> **Note:** Fallbacks are global—they do not depend on inheritance. You can define them anywhere, and they will always apply.
 
-Using the `fallback()` method, you may define a function that will be executed when no other route matches the incoming request.
+When no route matches the incoming request, you can use the `fallback()` method to handle these cases gracefully. This is useful for displaying custom 404 pages or JSON error responses.
+
+Define a fallback handler that runs when no route matches:
 
 ```php
 Route2::fallback(callback: function() {
@@ -316,20 +326,23 @@ Route2::fallback(callback: function() {
 });
 ```
 
-You can define a fallback with an optional prefix, ensuring it only triggers when the requested URI begins with the specified prefix. If used within a prefixed group, the group prefix will be applied by default unless another prefix is explicitly provided.
+You can scope a fallback to URIs that start with a specific prefix. This is especially useful for APIs or grouped routes. If used inside a group with a prefix, the group prefix is applied by default unless you specify another prefix.
 
 ```php
+// Fallback for all /api routes
 Route2::fallback('/api', function() {
     echo json_encode('page not found');
 });
 
-// This also works...
+// Or, inside a group (inherits the group prefix)
 Route2::group('/api', function() {
     Route2::fallback(callback: function() {
         echo json_encode('page not found');
     });
 });
 ```
+
+Fallbacks ensure your application responds predictably and user-friendly, even when a route is not found.
 
 ### Accessing Routes
 
@@ -338,6 +351,7 @@ The simplest way to access your routes is to put the file in your folder and run
 For example if you request ```http://your.site/yourscript.php/your/route``` it will automatically adjust to `/your/route`.
 
 ## Hooks
+
 Hooks allow you to execute custom logic at various points in the router's lifecycle. Use them to implement features like logging, dependency injection, or performance monitoring. By leveraging hooks, you gain fine-grained control and flexibility over your application's routing behavior.
 
 ### Registering Hooks
