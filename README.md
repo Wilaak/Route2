@@ -366,45 +366,49 @@ Route2::hook('eventName', function (...$args) {
 
 ### Available Hooks
 
+Below are the built-in hooks you can use to extend or customize Route2's behavior. Each hook provides contextual arguments for advanced use cases.
+
+---
+
 #### `routeFound`
-- **Description**: Triggered when a route is successfully matched.
-- **Arguments**:
-    - **`$requestMethod`** *(string)*: The HTTP method of the request.
-    - **`$requestUri`** *(string)*: The URI of the request.
-    - **`$params`** *(array)*: The parameters extracted from the route.
+- **When:** A route is successfully matched.
+- **Arguments:**
+    - `string $requestMethod` — The HTTP method (e.g., `GET`, `POST`).
+    - `string $requestUri` — The requested URI.
+    - `array $params` — Parameters extracted from the route.
 
 ---
 
 #### `invokeMiddleware`
-- **Description**: Triggered before invoking a middleware.
-- **Arguments**:
-    - **`$middleware`** *(callable)*: The middleware to be invoked.
+- **When:** Before a middleware is invoked.
+- **Arguments:**
+    - `callable $middleware` — The middleware about to be executed.
 
 ---
 
 #### `invokeController`
-- **Description**: Triggered before invoking the route's controller.
-- **Arguments**:
-    - **`$controller`** *(callable)*: The controller to be invoked.
-    - **`$params`** *(array)*: The parameters to be passed to the controller.
+- **When:** Before the route's controller (callback) is invoked.
+- **Arguments:**
+    - `callable $controller` — The controller to be called.
+    - `array $params` — Parameters to pass to the controller.
 
 ---
 
 #### `methodNotAllowed`
-- **Description**: Triggered when a route is matched, but the HTTP method is not allowed.
-- **Arguments**:
-    - **`$requestMethod`** *(string)*: The HTTP method of the request.
-    - **`$requestUri`** *(string)*: The URI of the request.
-    - **`$allowedMethods`** *(array)*: The list of allowed HTTP methods for the route.
+- **When:** A route matches, but the HTTP method is not allowed.
+- **Arguments:**
+    - `string $requestMethod` — The HTTP method used.
+    - `string $requestUri` — The requested URI.
+    - `array $allowedMethods` — Allowed HTTP methods for this route.
 
 ---
 
 #### `routeNotFound`
-- **Description**: Triggered when no route matches the request.
-- **Arguments**:
-    - **`$requestMethod`** *(string)*: The HTTP method of the request.
-    - **`$requestUri`** *(string)*: The URI of the request.
-    - **`$fallback`** *(callable)*: The fallback function to handle the request.
+- **When:** No route matches the request.
+- **Arguments:**
+    - `string $requestMethod` — The HTTP method used.
+    - `string $requestUri` — The requested URI.
+    - `callable $fallback` — The fallback handler for unmatched routes.
 
 ## Hide Scriptname From URL
 
