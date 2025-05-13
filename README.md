@@ -413,7 +413,7 @@ RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
 
 ## Performance
 
-The router should rarely be the bottleneck of an application, hopefully. For most applications, the performance of this router will be more than sufficient. However, if your project demands extreme performance, you might want to explore alternatives like [FastRoute](https://github.com/nikic/FastRoute).
+The router is and should rarely be the bottleneck of an application, hopefully. For most applications, the performance of this router will be more than sufficient. However, if your project demands extreme performance, you might want to explore alternatives like [FastRoute](https://github.com/nikic/FastRoute).
 
 ### Enable Route Cache
 
