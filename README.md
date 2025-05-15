@@ -4,40 +4,20 @@ A simple routing library for PHP web applications.
 
 ### Features
 
-- **Dynamic Route Parameters** 🧩  
+- **Route Parameters** 🧩  
     Define routes with required, optional, or wildcard parameters for flexible and expressive URL patterns.
 
-- **Advanced Parameter Validation** 🛡️  
+- **Parameter Validation** 🛡️  
     Enforce and transform route parameters using regular expressions or custom logic for precise control.
 
-- **Comprehensive Middleware Support** 🦺  
-    Integrate middleware before and after route execution for granular request processing and security.
+- **Middleware Support** 🦺  
+    Integrate middleware before and after route execution for granular request processing.
 
-- **Structured Route Grouping** 🗂️  
-    Organize related routes with group functionality, enabling shared attributes and a maintainable structure.
+- **Route Grouping** 🗂️  
+    Organize related routes with grouping, enabling shared attributes and a maintainable structure.
 
-- **Extensible Hook System** 🪝  
-    Customize and extend routing behavior with hooks—ideal for logging, dependency injection, or PSR-7 compatibility.
-
-- **High-Performance Routing** ⚡  
-    Benefit from a tree-based algorithm and optional route caching for fast and efficient route resolution.
-
-- **Lightweight and Dependency-Free** 🪶  
-    Minimal, single-file design with no external dependencies, easy to integrate and maintain.
-
-## Install
-
-Install with composer:
-
-    composer require wilaak/route2
-
-Or simply include it in your project:
-
-```php
-require '/path/to/Route2.php'
-```
-
-Requires PHP 8.1 or newer
+- **Dependency Free** 🪶  
+    Lightweight and dependency-free, offering enhanced security, easier integration and maintainability.
 
 ## Table of Contents
 
@@ -54,26 +34,29 @@ Requires PHP 8.1 or newer
 - [Middleware](#middleware)
   - [How to Register Middleware](#how-to-register-middleware)
 - [Route Groups](#route-groups)
-  - [Without prefix](#without-prefix)
+  - [Creating a Route Group](#creating-a-route-group)
+  - [Groups Without a Prefix](#groups-without-a-prefix)
 - [Dispatching](#dispatching)
-  - [Fallbacks](#fallbacks)
-  - [Accessing Routes](#accessing-routes)
-- [Hooks](#hooks)
-    - [How to Register Hooks](#how-to-register-hooks)
-    - [Available Hooks](#available-hooks)
-        - [`routeFound`](#routefound)
-        - [`invokeMiddleware`](#invokemiddleware)
-        - [`invokeController`](#invokecontroller)
-        - [`methodNotAllowed`](#methodnotallowed)
-        - [`routeNotFound`](#routenotfound)
-- [Hide Scriptname From URL](#hide-scriptname-from-url)
+  - [Accessing Your Routes](#accessing-your-routes)
+- [Hide Script Name from URL](#hide-script-name-from-url)
   - [FrankenPHP](#frankenphp)
   - [NGINX](#nginx)
   - [Apache](#apache)
-- [Performance](#performance)
-  - [Enable Route Cache](#enable-route-cache)
-  - [Benchmarks](#benchmarks)
 - [License](#license)
+
+## Install
+
+Install with composer:
+
+    composer require wilaak/route2
+
+Or simply include it in your project:
+
+```PHP
+require '/path/to/Route2.php'
+```
+
+Requires PHP 8.1 or newer
 
 ## Quick Start
 
@@ -86,16 +69,18 @@ require __DIR__.'/../vendor/autoload.php';
 
 use Wilaak\Http\Route2;
 
-Route2::get('/{world?}', function($world = 'World') {
+function hello($world) {
     echo "Hello, $world!";
-});
+}
+
+Route2::get('/{world?}', 'hello');
 
 Route2::dispatch();
 ```
 
 ### FrankenPHP Worker Mode
 
-Boot your application once and keep it in memory by using [worker mode](https://frankenphp.dev/docs/worker/). This dramatically increases performance.
+Boot your application once and keep it in memory by using [worker mode](https://frankenphp.dev/docs/worker/). This can dramatically increase performance.
 
 ```php
 <?php
@@ -106,9 +91,11 @@ require __DIR__.'/../vendor/autoload.php';
 
 use Wilaak\Http\Route2;
 
-Route2::get('/{world?}', function($world = 'World') {
+function hello($world) {
     echo "Hello, $world!";
-});
+}
+
+Route2::get('/{world?}', 'test');
 
 $handler = static function() {
     Route2::dispatch();
@@ -121,12 +108,12 @@ while (frankenphp_handle_request($handler)) {
 
 ## Basic Routing
 
-The most basic routes accept a URI and a closure, providing a very simple and expressive method of defining routes and behavior:
+Define routes by specifying the HTTP method, the URI pattern, and the handler to execute when the route matches. Handlers can be function names, static methods, or class methods (with automatic instantiation):
 
 ```php
-Route2::get('/greeting', function () {
-    echo 'Hello World';
-});
+Route2::get('/greeting', 'function_name')
+Route2::get('/greeting', 'StaticController::greeting');
+Route2::get('/greeting', [ObjectController::class, 'greeting']);
 ```
 
 ### Available Methods
@@ -147,17 +134,8 @@ Route2::options($uri, $callback);
 Sometimes you need to register a route that responds to multiple HTTP-verbs. You can do so using the `match()` method. Or, you can even register a route that responds to all HTTP verbs using the `any()` method:
 
 ```php
-Route2::match('get|post', '/', function() {
-    // Matches any method you like
-});
-
-Route2::form('/', function() {
-    // Matches GET and POST methods
-});
-
-Route2::any('/', function() {
-    // Matches any HTTP method
-});
+Route2::match('get|post', '/', 'handler');
+Route2::any('/', 'handler');
 ```
 
 ## Route Parameters
@@ -169,9 +147,11 @@ Sometimes you will need to capture segments of the URI within your route. For ex
 You can define as many route parameters as required by your route:
 
 ```php
-Route2::get('/posts/{post}/comments/{comment}', function ($post, $comment) {
-    // ...
-});
+function handler($post, $comment) {
+    echo $post . ' ' . $comment
+}
+
+Route2::get('/posts/{post}/comments/{comment}', 'handler');
 ```
 
 ### Required Parameters
@@ -179,9 +159,7 @@ Route2::get('/posts/{post}/comments/{comment}', function ($post, $comment) {
 These parameters must be provided or the route is skipped.
 
 ```php
-Route2::get('/user/{id}', function ($id) {
-    echo 'User '.$id;
-});
+Route2::get('/user/{id}', 'handler');
 ```
 
 ### Optional Parameters
@@ -191,9 +169,11 @@ Specify a route parameter that may not always be present in the URI. You may do 
 >**Note**: Must be the last parameter. Make sure to give the route's corresponding variable a default value:
 
 ```php
-Route2::get('/user/{name?}', function (string $name = 'John') {
+function handler($name = 'John') {
     echo $name;
-});
+}
+
+Route2::get('/user/{name?}', 'handler');
 ```
 
 ### Wildcard Parameters
@@ -203,96 +183,75 @@ Capture the whole segment including slashes by placing a `*` after the parameter
 >**Note**: Must be the last parameter. Make sure to give the route's corresponding variable a default value:
 
 ```php
-Route2::get('/somewhere/{any*}', function ($any = 'Empty') {
-    // Matches everything after the parameter
-});
+function handler($any = null) {
+    echo $any;
+}
+
+Route2::get('/somewhere/{any*}', 'handler');
 ```
 
 ### Parameter Expressions 
 
-You can enforce specific formats for your route parameters by using the `expression` named argument. This argument accepts an associative array where the keys represent parameter names, and the values can either be a regex pattern or a closure.
+You can enforce specific formats for your route parameters by using the `expression()` method. This method accepts an associative array where the keys represent parameter names, and the values can either be a regex pattern or a handler.
 
-- **Regex**: A regex string ensures the parameter matches the specified pattern. If not the route will be skipped.
-- **Closure**: The closure should return `true` to allow the parameter, `false` to skip the route, or any other value to assign it directly to the parameter.
+- **Regex**: Ensures the parameter matches the specified pattern. If not the route will be skipped.
+- **Handler**: The handler should return `true` to allow the parameter, `false` to skip the route, or any other value to assign it directly to the parameter.
 
-```php
-Route2::get('/user/{id}', function ($id) {
-    echo "User ID: $id";
-}, expression: ['id' => '[0-9]+']);
-
-Route2::get('/user/{id}', function ($id) {
-    echo "User ID: $id";
-}, expression: ['id' => is_numeric(...)]);
-
-Route2::get('/echo/{message}', function($message) {
-    echo $message;
-}, expression: ['message' => strtoupper(...)]);
-```
-
-If you would like a route parameter to always be affected by a given expression, you may use the `expression()` method. Routes added after this method will inherit the expression.
+Routes added after this method will inherit the expressions.
 
 ```php
 Route2::expression([
-    'id' => is_numeric(...)
+    // by specifying #^ ... $# you are telling the expression to use regex
+    'id' => '#^[0-9]+$#'
+    // uses a php function to verify that the value of id is numeric
+    'id2' => 'is_numeric',
+    // uses a php function to transform the parameter value
+    'name' => 'strtoupper'
 ]);
-
-Route2::get('/user/{id}', function ($id) {
-    // Only executed if {id} is numeric...
-});
 ```
 
 ## Middleware
 
-Middleware inspect and filter HTTP requests entering your application. You can imagine them as a series of layers that your application has to go through before hitting the main part. For instance, authentication middleware can redirect unauthenticated users to a login screen, while allowing authenticated users to proceed.
+Middleware are like filters or layers that process HTTP requests before and after they reach your application's core logic. Think of them as checkpoints—each middleware can inspect, modify, or even halt a request. For example, an authentication middleware might redirect unauthenticated users to a login page, while letting authenticated users continue.
 
->**Note**: Middleware only run if a route is found.
+> **Important:** If a middleware handler returns `false`, the request will be halted and a 404 page will be displayed.
+
+> **Note:** Middleware are only executed when a matching route is found.
 
 ### How to Register Middleware 
 
-You may register a middleware by using the `before()` and `after()` methods. Routes added after this method call will inherit the middleware. You may also assign a middleware to a specific route by using the named arguments `before` and `after`:
+Use the `before()` and `after()` methods to register middleware that runs before or after your route handlers. Middleware can be function names, static methods, or class methods (with automatic instantiation).
+
+Any routes defined after calling these methods will automatically inherit the registered middleware.
 
 ```php
-// Runs before the route callback
-Route2::before([
-    your_middleware(...),
-]);
+Route2::before('handler');
+Route2::after('handler');
 
-// Runs after the route callback
-Route2::after(function() {
-    echo 'Terminating!';
-});
-
-// Runs before the route but after the inherited middleware
-Route2::get('/', function() {
-    // ...
-}, before: fn() => print('I am also a middleware'));
+// routes added below will inherit the middleware
 ```
 
 ## Route Groups
 
-Route groups let you share attributes like middleware and expressions across multiple routes, avoiding repetition. Nested groups inherit attributes from their parent, similar to variable scopes.
+Route groups make it easy to organize related routes and share common attributes—such as middleware or parameter expressions—across multiple routes. This helps keep your code DRY and maintainable. Groups can be nested, and nested groups automatically inherit attributes from their parent, much like variable scopes.
+
+### Creating a Route Group
+
+To group routes under a common prefix, use the `group()` method. All routes defined within the group will share the specified prefix and any attributes you assign:
 
 ```php
-// Group routes under a common prefix
 Route2::group('/admin', function () {
-    // Middleware for all routes in this group and its nested groups
-    Route2::before(function () {
-        echo "Group middleware executed.<br>";
-    });
-    Route2::get('/dashboard', function () {
-        echo "Admin Dashboard";
-    });
-    Route2::post('/settings', function () {
-        echo "Admin Settings Updated";
-    });
+    // this middleware only affect routes within this group and its children
+    Route2::before('admin_middleware_handler');
+
+    Route2::get( '/dashboard', 'admin_dashboard_handler');
+    Route2::post('/settings',  'admin_settings_handler');
 });
 ```
 
-In this example, all routes within the group will share the `/admin` prefix.
+### Groups Without a Prefix
 
-### Without prefix
-
-You may also define a group without a prefix by omitting the first argument and using the named argument `callback`.
+You can also create a group without a prefix by omitting the first argument and using the `callback` named argument. This is useful for sharing route attributes without affecting the route path:
 
 ```php
 Route2::group(callback: function () {
@@ -312,106 +271,11 @@ If you need more control, you can also call `dispatch()` with explicit HTTP meth
 Route2::dispatch('POST', '/custom/route');
 ```
 
-This flexibility allows you to easily test routes or integrate with custom server environments.
-
-
-### Fallbacks
-
-> **Note:** Fallbacks are global—they do not depend on inheritance. You can define them anywhere, and they will always apply.
-
-When no route matches the incoming request, you can use the `fallback()` method to handle these cases gracefully. This is useful for displaying custom 404 pages or JSON error responses.
-
-Define a fallback handler that runs when no route matches:
-
-```php
-Route2::fallback(callback: function() {
-    echo <<<HTML
-        <h1>Page not found</h1>
-    HTML;
-});
-```
-
-You can scope a fallback to URIs that start with a specific prefix. This is especially useful for APIs or grouped routes. If used inside a group with a prefix, the group prefix is applied by default unless you specify another prefix.
-
-```php
-// Fallback for all /api routes
-Route2::fallback('/api', function() {
-    echo json_encode('page not found');
-});
-
-// Or, inside a group (inherits the group prefix)
-Route2::group('/api', function() {
-    Route2::fallback(callback: function() {
-        echo json_encode('page not found');
-    });
-});
-```
-
-Fallbacks ensure your application responds predictably and user-friendly, even when a route is not found.
-
-### Accessing Routes
+### Accessing Your Routes
 
 The simplest way to access your routes is to put the file in your folder and run it.
 
-For example if you request ```http://your.site/yourscript.php/your/route``` it will automatically adjust to `/your/route`.
-
-## Hooks
-
-Hooks allow you to execute custom logic at various points in the router's lifecycle. Use them to implement features like logging, dependency injection, or performance monitoring. By leveraging hooks, you gain fine-grained control and flexibility over your application's routing behavior.
-
-### How to Register Hooks
-
-To register a callback for a specific event, you may use the `hook()` method:
-
-```PHP
-Route2::hook('eventName', function (...$args) {
-    // Your custom logic here
-});
-```
-
-### Available Hooks
-
-Below are the built-in hooks you can use to extend or customize the router behavior.
-
-#### `routeFound`
-- **When:** A route is successfully matched.
-- **Arguments:**
-    - `string $requestMethod` — The HTTP method (e.g., `GET`, `POST`).
-    - `string $requestUri` — The requested URI.
-    - `array $params` — Parameters extracted from the route.
-
----
-
-#### `invokeMiddleware`
-- **When:** Before a middleware is invoked.
-- **Arguments:**
-    - `callable $middleware` — The middleware about to be executed.
-
----
-
-#### `invokeController`
-- **When:** Before the route's controller (callback) is invoked.
-- **Arguments:**
-    - `callable $controller` — The controller to be called.
-    - `array $params` — Parameters to pass to the controller.
-
----
-
-#### `methodNotAllowed`
-- **When:** A route matches, but the HTTP method is not allowed.
-- **Arguments:**
-    - `string $requestMethod` — The HTTP method used.
-    - `string $requestUri` — The requested URI.
-    - `array $allowedMethods` — Allowed HTTP methods for this route.
-
----
-
-#### `routeNotFound`
-- **When:** No route matches the request.
-- **Arguments:**
-    - `string $requestMethod` — The HTTP method used.
-    - `string $requestUri` — The requested URI.
-    - `callable $fallback` — The fallback handler for unmatched routes.
+When you visit a URL like `http://your.site/yourscript.php/your/route`, the router will automatically adjust the path to `/your/route`.
 
 ## Hide Script Name from URL
 
@@ -441,43 +305,6 @@ RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
 ```
-
-## Performance
-
-The router is and should rarely be the bottleneck of an application, hopefully. For most applications, the performance of this router will be more than sufficient.
-
-### Enable Route Cache
-
-To optimize route lookups, this router uses a tree-based algorithm. However, regenerating the tree for every request slows down performance. To improve application boot times, you can enable route tree caching. Simply invoke the `fromCache()` method before defining any routes in your application.
-
-The named argument `expire` can be set to an integer representing how many seconds till the cache gets invalidated and rebuilt again.
-
->**Note**: Route caching is not necessary in worker mode since the route tree is retained in memory. You may still enable it if you find yourself restarting the workers often.
-
->**Caution**: Use caution when setting the `filepath`. The specified file may be overwritten or removed during the caching process, so ensure it does not conflict with other important files.
-
-```php
-Route2::fromCache(
-    enabled: true,
-    expire: false,
-    filepath: 'Route2.cache.php'
-);
-
-// Define routes below...
-```
-
-### Benchmarks
-
-This test was done using FrankenPHP and `wrk` on a Windows 11 machine in WSL with an Intel Core i5-12400 Processor.
-
-
-| Benchmark | Routes| Average Latency | Requests Per Second
-| --- | ----------- | - | - |
-Worker Baseline | 1 |82.11ms | 62327.59
-Worker | 178 (bitbucket) | 81.94ms | 57133.98
-Classic Baseline | 1 | 104.75ms | 36100.91
-Classic Cached | 178 (bitbucket) | 109.69ms |25992.43
-Classic | 178 (bitbucket) | 31.35ms | 15652.60 
 
 ## License
 
