@@ -116,7 +116,7 @@ class Route2
     static function after(array $middlewares): void
     {
         foreach ($middlewares as $middleware) {
-            self::$routeCreationContext['after'][] = $middlewares;
+            self::$routeCreationContext['after'][] = $middleware;
         }
     }
 
