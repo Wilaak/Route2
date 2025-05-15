@@ -142,7 +142,13 @@ Route2::any('/', 'handler');
 
 Sometimes you will need to capture segments of the URI within your route. For example, you may need to capture a user's ID from the URL. You may do so by defining route parameters:
 
->**Note**: Parameters must be enclosed in forward slashes (e.g., `/{param}/`) and the names must not contain any special characters.
+> **Note:**  
+> - Enclose parameters in curly braces within your route path, like `/{param}` or `/{param}/`.
+> - Parameter names should use only letters, numbers, and underscores—no dashes or special characters.
+>
+> **Examples:**  
+> - `/user-{id}` &nbsp;❌&nbsp; *(invalid)*  
+> - `/user/{id}` &nbsp;✅&nbsp; *(valid)*
 
 You can define as many route parameters as required by your route:
 
@@ -201,11 +207,11 @@ Routes added after this method will inherit the expressions.
 
 ```php
 Route2::expression([
-    // by specifying #^ ... $# you are telling the expression to use regex
+    // By specifying #^ ... $# you are telling the expression to use regex
     'id' => '#^[0-9]+$#'
-    // uses a php function to verify that the value of id is numeric
-    'id2' => 'is_numeric',
-    // uses a php function to transform the parameter value
+    // Uses php function to verify that the value of id is numeric
+    'id' => 'is_numeric',
+    // Uses php function to transform the parameter value
     'name' => 'strtoupper'
 ]);
 ```
@@ -218,17 +224,19 @@ Middleware are like filters or layers that process HTTP requests before and afte
 
 > **Note:** Middleware are only executed when a matching route is found.
 
-### How to Register Middleware 
+### How to Register Middleware
 
-Use the `before()` and `after()` methods to register middleware that runs before or after your route handlers. Middleware can be function names, static methods, or class methods (with automatic instantiation).
+You can easily add middleware to your routes using the `before()` and `after()` methods. These methods accept an array of middleware handlers.
 
-Any routes defined after calling these methods will automatically inherit the registered middleware.
+Once middleware is registered, all routes defined afterwards will automatically inherit them.
 
 ```php
-Route2::before('handler');
-Route2::after('handler');
+Route2::before([
+    'your_middleware_handler',
+    [YourMiddleware::class, 'handler']
+]);
 
-// routes added below will inherit the middleware
+// Routes defined below will use the registered middleware
 ```
 
 ## Route Groups
@@ -241,8 +249,8 @@ To group routes under a common prefix, use the `group()` method. All routes defi
 
 ```php
 Route2::group('/admin', function () {
-    // this middleware only affect routes within this group and its children
-    Route2::before('admin_middleware_handler');
+    // This middleware only affect routes within this group and its children
+    Route2::before(['admin_middleware_handler']);
 
     Route2::get( '/dashboard', 'admin_dashboard_handler');
     Route2::post('/settings',  'admin_settings_handler');

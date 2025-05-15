@@ -28,7 +28,7 @@ class Route2
     /**
      * Adds a route to the route tree.
      */
-    static function match(string $methods, string $uri, array $handler): void
+    static function match(string $methods, string $uri, string|array $handler): void
     {
         $routeUri     = self::$routeCreationContext['prefix'] . $uri;
         $routeMethods = explode('|', strtoupper($methods));
@@ -60,42 +60,42 @@ class Route2
     }
 
     /** Shorthand for `Route2::match('GET', ...)` */
-    public static function get(string $uri, array $handler): void
+    public static function get(string $uri, string|array $handler): void
     {
         self::match('GET', $uri, $handler);
     }
     /** Shorthand for `Route2::match('POST', ...)` */
-    public static function post(string $uri, array $handler): void
+    public static function post(string $uri, string|array $handler): void
     {
         self::match('POST', $uri, $handler);
     }
     /** Shorthand for `Route2::match('PUT', ...)` */
-    public static function put(string $uri, array $handler): void
+    public static function put(string $uri, string|array $handler): void
     {
         self::match('PUT', $uri, $handler);
     }
     /** Shorthand for `Route2::match('DELETE', ...)` */
-    public static function delete(string $uri, array $handler): void
+    public static function delete(string $uri, string|array $handler): void
     {
         self::match('DELETE', $uri, $handler);
     }
     /** Shorthand for `Route2::match('PATCH', ...)` */
-    public static function patch(string $uri, array $handler): void
+    public static function patch(string $uri, string|array $handler): void
     {
         self::match('PATCH', $uri, $handler);
     }
     /** Shorthand for `Route2::match('OPTIONS', ...)` */
-    public static function options(string $uri, array $handler): void
+    public static function options(string $uri, string|array $handler): void
     {
         self::match('OPTIONS', $uri, $handler);
     }
     /** Shorthand for `Route2::match('GET|POST', ...)` */
-    public static function form(string $uri, array $handler): void
+    public static function form(string $uri, string|array $handler): void
     {
         self::match('GET|POST', $uri, $handler);
     }
     /** Shorthand for `Route2::match('GET|POST|PUT|DELETE|PATCH|OPTIONS', ...)` */
-    public static function any(string $uri, array $handler): void
+    public static function any(string $uri, string|array $handler): void
     {
         self::match('GET|POST|PUT|DELETE|PATCH|OPTIONS', $uri, $handler);
     }
@@ -103,17 +103,21 @@ class Route2
     /**
      * Adds middlewares to the route creation context.
      */
-    static function before(string|array $middleware): void
+    static function before(array $middlewares): void
     {
-        self::$routeCreationContext['before'][] = $middleware;
+        foreach ($middlewares as $middleware) {
+            self::$routeCreationContext['before'][] = $middleware;
+        }
     }
 
     /**
      * Adds middlewares to the route creation context.
      */
-    static function after(string|array $middleware): void
+    static function after(array $middlewares): void
     {
-        self::$routeCreationContext['after'][] = $middleware;
+        foreach ($middlewares as $middleware) {
+            self::$routeCreationContext['after'][] = $middlewares;
+        }
     }
 
     /**
@@ -240,7 +244,6 @@ class Route2
                 continue;
             }
 
-            // Execute 'before' middlewares
             foreach ($route['before'] as $middleware) {
                 $result = is_array($middleware)
                     ? (new $middleware[0]())->{$middleware[1]}()
@@ -250,14 +253,12 @@ class Route2
                 }
             }
 
-            // Call the route handler 
             if (is_array($route['handler'])) {
                 (new $route['handler'][0]())->{$route['handler'][1]}(...$params);
             } else {
                 $route['handler'](...$params);
             }
 
-            // Execute 'after' middlewares
             foreach ($route['after'] as $middleware) {
                 $result = is_array($middleware)
                     ? (new $middleware[0]())->{$middleware[1]}()
