@@ -5,43 +5,45 @@ A simple routing library for PHP web applications.
 ### Features
 
 - **Route Parameters** 🧩  
-    Define routes with required, optional, or wildcard parameters for flexible and expressive URL patterns.
+    Flexible URLs with required, optional, or wildcard segments.
 
 - **Parameter Validation** 🛡️  
-    Enforce and transform route parameters using regular expressions or custom logic for precise control.
+    Filter and transform parameters using Regex or custom logic.
 
-- **Middleware Support** 🦺  
-    Integrate middleware before and after route execution for granular request processing.
+- **Middleware** 🦺  
+    Execute logic before and after core application logic.
 
-- **Route Grouping** 🗂️  
-    Organize related routes with grouping, enabling shared attributes and a maintainable structure.
+- **Route Groups** 🗂️  
+    Organize and share attributes across routes.
 
-- **Dependency Free** 🪶  
-    Lightweight and dependency-free, offering enhanced security, easier integration and maintainability.
+- **Zero Dependencies** 🪶  
+    Minimalistic, single-file, no-frills routing solution.
 
 ## Table of Contents
 
+- [Install](#install)
 - [Quick Start](#quick-start)
-  - [FrankenPHP Worker Mode](#frankenphp-worker-mode)
+    - [FrankenPHP Worker Mode](#frankenphp-worker-mode)
+- [What is a Handler?](#what-is-a-handler)
 - [Basic Routing](#basic-routing)
-  - [Available Methods](#available-methods)
-  - [Multiple HTTP-verbs](#multiple-http-verbs)
+    - [Available Methods](#available-methods)
+    - [Multiple HTTP-verbs](#multiple-http-verbs)
 - [Route Parameters](#route-parameters)
-  - [Required Parameters](#required-parameters)
-  - [Optional Parameters](#optional-parameters)
-  - [Wildcard Parameters](#wildcard-parameters)
-  - [Parameter Expressions](#parameter-expressions)
+    - [Required Parameters](#required-parameters)
+    - [Optional Parameters](#optional-parameters)
+    - [Wildcard Parameters](#wildcard-parameters)
+    - [Parameter Expressions](#parameter-expressions)
 - [Middleware](#middleware)
-  - [How to Register Middleware](#how-to-register-middleware)
+    - [How to Register Middleware](#how-to-register-middleware)
 - [Route Groups](#route-groups)
-  - [Creating a Route Group](#creating-a-route-group)
-  - [Groups Without a Prefix](#groups-without-a-prefix)
+    - [Creating a Route Group](#creating-a-route-group)
+    - [Groups Without a Prefix](#groups-without-a-prefix)
 - [Dispatching](#dispatching)
-  - [Accessing Your Routes](#accessing-your-routes)
+    - [Accessing Your Routes](#accessing-your-routes)
 - [Hide Script Name from URL](#hide-script-name-from-url)
-  - [FrankenPHP](#frankenphp)
-  - [NGINX](#nginx)
-  - [Apache](#apache)
+    - [FrankenPHP](#frankenphp)
+    - [NGINX](#nginx)
+    - [Apache](#apache)
 - [License](#license)
 
 ## Install
@@ -106,12 +108,33 @@ while (frankenphp_handle_request($handler)) {
 }
 ```
 
+## What is a Handler?
+
+You'll see the term **handler** mentioned throughout this document. But what does it mean? In this router, a handler is simply a reference to the function or method that will be executed when a route matches.
+
+You can define handlers in several ways:
+
+- **Function Name**  
+    Use a string with the name of a global function:  
+    `'greeting'`
+
+- **Static Class Method**  
+    Use a string in the format:  
+    `'StaticController::greeting'`
+
+- **Instance Method (Array Syntax)**  
+    Use an array with the class and method name:  
+    `[ObjectController::class, 'greeting']`  
+    or  
+    `['ObjectController', 'greeting']`  
+    In this case it will instantiate the class before calling the method.
+
 ## Basic Routing
 
-Define routes by specifying the HTTP method, the URI pattern, and the handler to execute when the route matches. Handlers can be function names, static methods, or class methods (with automatic instantiation):
+Define routes by specifying the HTTP method, the URI pattern, and the [handler](#what-is-a-handler) to execute when the route matches.
 
 ```php
-Route2::get('/greeting', 'function_name')
+Route2::get('/greeting', 'greeting');
 Route2::get('/greeting', 'StaticController::greeting');
 Route2::get('/greeting', [ObjectController::class, 'greeting']);
 ```
@@ -134,7 +157,11 @@ Route2::options($uri, $callback);
 Sometimes you need to register a route that responds to multiple HTTP-verbs. You can do so using the `match()` method. Or, you can even register a route that responds to all HTTP verbs using the `any()` method:
 
 ```php
+// Specify your own methods
 Route2::match('get|post', '/', 'handler');
+// For GET and POST methods
+Route2::form('/', 'handler')
+// Matches all HTTP methods
 Route2::any('/', 'handler');
 ```
 
@@ -145,10 +172,11 @@ Sometimes you will need to capture segments of the URI within your route. For ex
 > **Note:**  
 > - Enclose parameters in curly braces within your route path, like `/{param}` or `/{param}/`.
 > - Parameter names should use only letters, numbers, and underscores—no dashes or special characters.
+> - If a parameter is not the last segment in the route, it must be enclosed in forward slashes (e.g., `/posts/{post}/comments/{comment}`), not embedded within a segment.
 >
 > **Examples:**  
-> - `/user-{id}` &nbsp;❌&nbsp; *(invalid)*  
-> - `/user/{id}` &nbsp;✅&nbsp; *(valid)*
+> - `/posts/{post}/comments/{comment}` &nbsp;✅&nbsp; *(valid)*  
+> - `/posts/{post}-comments/{comment}` &nbsp;❌&nbsp; *(invalid)*
 
 You can define as many route parameters as required by your route:
 
@@ -172,7 +200,7 @@ Route2::get('/user/{id}', 'handler');
 
 Specify a route parameter that may not always be present in the URI. You may do so by placing a `?` mark after the parameter name.
 
->**Note**: Must be the last parameter. Make sure to give the route's corresponding variable a default value:
+>**Note**: Make sure to give the route's corresponding variable a default value:
 
 ```php
 function handler($name = 'John') {
@@ -186,7 +214,7 @@ Route2::get('/user/{name?}', 'handler');
 
 Capture the whole segment including slashes by placing a `*` after the parameter name.
 
->**Note**: Must be the last parameter. Make sure to give the route's corresponding variable a default value:
+>**Note** Make sure to give the route's corresponding variable a default value:
 
 ```php
 function handler($any = null) {
@@ -198,37 +226,35 @@ Route2::get('/somewhere/{any*}', 'handler');
 
 ### Parameter Expressions 
 
-You can enforce specific formats for your route parameters by using the `expression()` method. This method accepts an associative array where the keys represent parameter names, and the values can either be a regex pattern or a handler.
+You can enforce specific formats for your route parameters by using the `expression()` method. This method accepts an associative array where the keys represent parameter names, and the values can either be a regex pattern or a [handler](#what-is-a-handler).
 
-- **Regex**: Ensures the parameter matches the specified pattern. If not the route will be skipped.
-- **Handler**: The handler should return `true` to allow the parameter, `false` to skip the route, or any other value to assign it directly to the parameter.
+- **Regex**: Ensures the parameter matches the specified pattern. If not, the route will be skipped.
+- **Handler**: The [handler](#what-is-a-handler) receives the parameter value as its argument. It should return `true` to allow the parameter, `false` to skip the route, or any other value to assign it directly to the parameter.
 
 Routes added after this method will inherit the expressions.
 
 ```php
 Route2::expression([
     // By specifying #^ ... $# you are telling the expression to use regex
-    'id' => '#^[0-9]+$#'
-    // Uses php function to verify that the value of id is numeric
+    'id' => '#^[0-9]+$#',
+    // Uses function to verify that the value of id is numeric
     'id' => 'is_numeric',
-    // Uses php function to transform the parameter value
+    // Uses function to transform the parameter value
     'name' => 'strtoupper'
 ]);
 ```
 
 ## Middleware
 
-Middleware are like filters or layers that process HTTP requests before and after they reach your application's core logic. Think of them as checkpoints—each middleware can inspect, modify, or even halt a request. For example, an authentication middleware might redirect unauthenticated users to a login page, while letting authenticated users continue.
+Middlewares are like filters or layers that process HTTP requests before and after they reach your application's core logic. Think of them as checkpoints—each middleware can inspect, modify, or even halt a request. For example, an authentication middleware might redirect unauthenticated users to a login page, while letting authenticated users continue.
 
-> **Important:** If a middleware handler returns `false`, the request will be halted and a 404 page will be displayed.
-
-> **Note:** Middleware are only executed when a matching route is found.
+> **Note:** If a middleware [handler](#what-is-a-handler) returns `false`, the request will be halted and a 404 page will be displayed. Middleware are only executed when a matching route is found.
 
 ### How to Register Middleware
 
-You can easily add middleware to your routes using the `before()` and `after()` methods. These methods accept an array of middleware handlers.
+You can add middleware to your routes using the `before()` and `after()` methods. These methods accept an array of middleware [handlers](#what-is-a-handler).
 
-Once middleware is registered, all routes defined afterwards will automatically inherit them.
+Once a middleware is registered, all routes defined afterwards will inherit them.
 
 ```php
 Route2::before([
@@ -236,12 +262,12 @@ Route2::before([
     [YourMiddleware::class, 'handler']
 ]);
 
-// Routes defined below will use the registered middleware
+// Routes defined below will use the middleware
 ```
 
 ## Route Groups
 
-Route groups make it easy to organize related routes and share common attributes—such as middleware or parameter expressions—across multiple routes. This helps keep your code DRY and maintainable. Groups can be nested, and nested groups automatically inherit attributes from their parent, much like variable scopes.
+Route groups make it easy to organize related routes and share common attributes—such as middleware or parameter expressions—across multiple routes. Groups can be nested, and nested groups automatically inherit attributes from their parent, much like variable scopes.
 
 ### Creating a Route Group
 
@@ -251,7 +277,6 @@ To group routes under a common prefix, use the `group()` method. All routes defi
 Route2::group('/admin', function () {
     // This middleware only affect routes within this group and its children
     Route2::before(['admin_middleware_handler']);
-
     Route2::get( '/dashboard', 'admin_dashboard_handler');
     Route2::post('/settings',  'admin_settings_handler');
 });
@@ -271,7 +296,7 @@ Route2::group(callback: function () {
 
 The `dispatch()` method is responsible for handling incoming requests and matching them to your defined routes.
 
-By default, `dispatch()` automatically detects the HTTP method and the relative URI from the current request, using `$_SERVER['REQUEST_METHOD']` and `$_SERVER['REQUEST_URI']` in combination with the `getRelativeRequestUri()` helper. For example, a request to `/folder/index.php/myroute` will be resolved as `/myroute`.
+By default, `dispatch()` automatically detects the HTTP method and the relative URI from the current request, using `$_SERVER['REQUEST_METHOD']` and `$_SERVER['REQUEST_URI']` from the `getRelativeRequestUri()` helper. For example, a request to `/folder/index.php/myroute` will be resolved as `/myroute`.
 
 If you need more control, you can also call `dispatch()` with explicit HTTP method and URI arguments:
 
