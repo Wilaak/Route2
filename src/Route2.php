@@ -12,9 +12,7 @@ class Route2
 {
     const ROUTE_NODE = '_route';
     const PARAM_NODE = '_param';
-    
     static array $routeTree = [];
-
     static array $buildContext = [
         'prefix'      => '',
         'before'      => [],
@@ -27,8 +25,7 @@ class Route2
         $methods  = explode('|', strtoupper($methods));
         $segments = preg_split('/(?=\/)/', self::$buildContext['prefix'] . $uri, -1, PREG_SPLIT_NO_EMPTY);
         foreach ($segments as $key => $segment) {
-            if (!str_starts_with($segment, '/{'))
-                continue;
+            if (!str_starts_with($segment, '/{')) continue;
             $segments[$key] = self::PARAM_NODE;
         }
         $currentNode = &self::$routeTree;
@@ -62,21 +59,9 @@ class Route2
     static function options($uri, $handler): void { self::match('OPTIONS', $uri, $handler); }
     static function form($uri, $handler): void { self::match('GET|POST', $uri, $handler); }
     static function any($uri, $handler): void { self::match('GET|POST|PUT|DELETE|PATCH|OPTIONS', $uri, $handler); }
-
-    static function before(array $middlewares): void
-    {
-        self::$buildContext['before'] = array_merge(self::$buildContext['before'], $middlewares);
-    }
-
-    static function after(array $middlewares): void
-    {
-        self::$buildContext['after'] = array_merge(self::$buildContext['after'], $middlewares);
-    }
-
-    static function expression(array $expression): void
-    {
-        self::$buildContext['expressions'] += $expression;
-    }
+    static function before(array $middlewares): void { self::$buildContext['before'] = array_merge(self::$buildContext['before'], $middlewares); }
+    static function after(array $middlewares): void { self::$buildContext['after'] = array_merge(self::$buildContext['after'], $middlewares); }
+    static function expression(array $expression): void { self::$buildContext['expressions'] += $expression; }
 
     static function group(?string $prefix = null, ?callable $callback = null): void
     {
@@ -92,10 +77,7 @@ class Route2
     {
         $uri = $_SERVER['REQUEST_URI'];
         $script = $_SERVER['SCRIPT_NAME'];
-
-        if (str_starts_with($uri, $script)) {
-            $uri = substr($uri, strlen($script));
-        }
+        if (str_starts_with($uri, $script)) $uri = substr($uri, strlen($script));
         return $uri === '/' || $uri === '' ? '/' : $uri;
     }
 
@@ -121,41 +103,27 @@ class Route2
 
         foreach (self::findMatchingRoutes($requestUri) as $route) {
             $matches = [];
-            if (!preg_match($route['pattern'], $requestUri, $matches)) {
-                continue;
-            }
+            if (!preg_match($route['pattern'], $requestUri, $matches)) continue;
 
             $parameters = [];
             foreach ($matches as $key => $value) {
-                if (is_string($key) && !empty($value)) {
-                    $parameters[$key] = $value;
-                }
+                if (is_string($key) && !empty($value)) $parameters[$key] = $value;
             }
 
             foreach ($route['expressions'] as $parameterName => $expression) {
-                if (!isset($parameters[$parameterName])) {
-                    continue;
-                }
+                if (!isset($parameters[$parameterName])) continue;
                 if (str_starts_with($expression, '#^') && str_ends_with($expression, '$#')) {
-                    if (!preg_match($expression, $parameters[$parameterName])) {
-                        continue 2;
-                    }
+                    if (!preg_match($expression, $parameters[$parameterName])) continue 2;
                     continue;
                 }
                 $result = (self::getHandler($expression, $parameters[$parameterName]))();
-                if ($result === false) {
-                    continue 2;
-                }
-                if ($result === true) {
-                    continue;
-                }
+                if ($result === false) continue 2;
+                if ($result === true)  continue;
                 $parameters[$parameterName] = $result;
             }
 
             array_push($allowedMethods, ...$route['methods']);
-            if (!in_array($requestMethod, $route['methods'])) {
-                continue;
-            }
+            if (!in_array($requestMethod, $route['methods'])) continue;
 
             foreach ($route['before'] as $middleware) {
                 (self::getHandler($middleware))();

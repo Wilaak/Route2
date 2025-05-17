@@ -182,10 +182,8 @@ Often, you'll want to capture parts of the URL as variables—such as a user's I
 >   - `/posts/{post}/comments/{comment}` &nbsp;✅&nbsp; *(valid)*  
 >   - `/posts/{post}-comments/{comment}` &nbsp;❌&nbsp; *(invalid)*
 
----
-
-> **Notice:**  
-> Route2 always prefers exact matches over parameterized routes.  
+> **Warning:**  
+> Route2 always prefers exact matches over parameterized routes. For example:
 > ```php
 > Route2::get('/somewhere/{any}', 'handler');
 > Route2::get('/somewhere/someplace', 'handler');
