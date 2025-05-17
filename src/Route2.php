@@ -10,7 +10,8 @@ namespace Wilaak\Http;
  */
 class Route2
 {
-    const LEAF_NODE = 1337;
+    const ROUTE_NODE = '_route';
+    const PARAM_NODE = '_param';
     
     static array $routeTree = [];
 
@@ -24,8 +25,18 @@ class Route2
     static function match(string $methods, string $uri, string|array $handler): void
     {
         $methods  = explode('|', strtoupper($methods));
-        $segments = preg_replace('/\/\{(\w+)(\?|(\*))?\}(?=\/|$)/', '/*', $uri);
-        $segments = preg_split('/(?=\/)/', self::$buildContext['prefix'] . $segments, -1, PREG_SPLIT_NO_EMPTY);
+        $segments = preg_split('/(?=\/)/', self::$buildContext['prefix'] . $uri, -1, PREG_SPLIT_NO_EMPTY);
+        foreach ($segments as $key => $segment) {
+            if (!str_starts_with($segment, '/{'))
+                continue;
+            $segments[$key] = self::PARAM_NODE;
+        }
+        $currentNode = &self::$routeTree;
+        foreach ($segments as $segment) {
+            $currentNode[$segment] ??= [];
+            $currentNode = &$currentNode[$segment];
+        }
+
         $pattern  = preg_replace(
             ['/\{(\w+)\}/', '/\{(\w+)\?\}/', '/\{(\w+)\*\}/'],
             ['(?P<$1>[^/]+)', '(?P<$1>[^/]*)', '(?P<$1>.*)'],
@@ -33,12 +44,7 @@ class Route2
         );
         $pattern = '#^' . $pattern . '$#';
 
-        $currentNode = &self::$routeTree;
-        foreach ($segments as $segment) {
-            $currentNode[$segment] ??= [];
-            $currentNode = &$currentNode[$segment];
-        }
-        $currentNode[self::LEAF_NODE][] = [
+        $currentNode[self::ROUTE_NODE][] = [
             'pattern'     => $pattern,
             'methods'     => $methods,
             'handler'     => $handler,
@@ -100,13 +106,11 @@ class Route2
         foreach ($segments as $segment) {
             if (isset($tree[$segment])) {
                 $tree = $tree[$segment];
-            } elseif (isset($tree['/*'])) {
-                $tree = $tree['/*'];
-            } else {
-                return [];
+            } elseif (isset($tree[self::PARAM_NODE])) {
+                $tree = $tree[self::PARAM_NODE];
             }
         }
-        return $tree[self::LEAF_NODE];
+        return $tree[self::ROUTE_NODE] ?? [];
     }
 
     static function dispatch(?string $requestMethod = null, ?string $requestUri = null): bool
@@ -138,7 +142,7 @@ class Route2
                     }
                     continue;
                 }
-                $result = $expression($parameters[$parameterName]);
+                $result = (self::getHandler($expression, $parameters[$parameterName]))();
                 if ($result === false) {
                     continue 2;
                 }
@@ -154,33 +158,13 @@ class Route2
             }
 
             foreach ($route['before'] as $middleware) {
-                if (is_array($middleware)) {
-                    $instance = new $middleware[0]();
-                    $result = $instance->{$middleware[1]}();
-                } else {
-                    $result = $middleware();
-                }
-                if ($result === false) {
-                    return false;
-                }
+                (self::getHandler($middleware))();
             }
 
-            if (is_array($route['handler'])) {
-                (new $route['handler'][0]())->{$route['handler'][1]}(...$parameters);
-            } else {
-                $route['handler'](...$parameters);
-            }
+            (self::getHandler($route['handler'], $parameters))();
 
             foreach ($route['after'] as $middleware) {
-                if (is_array($middleware)) {
-                    $instance = new $middleware[0]();
-                    $result = $instance->{$middleware[1]}();
-                } else {
-                    $result = $middleware();
-                }
-                if ($result === false) {
-                    return false;
-                }
+                (self::getHandler($middleware))();
             }
             return true;
         }
@@ -193,5 +177,15 @@ class Route2
             echo '404 Not Found';
         }
         return false;
+    }
+
+    static function getHandler(string|array $handler, array $parameters = []): callable
+    {
+        if (is_array($handler)) {
+            $instance = new $handler[0]();
+            return fn() => $instance->{$handler[1]}();
+        } else {
+            return fn() => $handler(...$parameters);
+        }
     }
 }

@@ -4,20 +4,23 @@ A simple routing library for PHP web applications.
 
 ### Features
 
-- **Route Parameters** 🧩  
-    Flexible URLs with required, optional, or wildcard segments.
+- **Flexible URLs** 🧩  
+    Support for required, optional, and wildcard segments.
 
 - **Parameter Validation** 🛡️  
-    Filter and transform parameters using Regex or custom logic.
+    Filter or transform parameters with regex or custom logic.
 
 - **Middleware** 🦺  
-    Execute logic before and after core application logic.
+    Add logic before or after route handlers.
 
 - **Route Groups** 🗂️  
     Organize and share attributes across routes.
 
+- **High Performance** ⚡  
+    Efficient tree-based route matching that is easy to cache.
+
 - **Zero Dependencies** 🪶  
-    Minimalistic, single-file, no-frills routing solution.
+    Single-file, no-frills dependency-free routing solution.
 
 ## Table of Contents
 
@@ -40,6 +43,9 @@ A simple routing library for PHP web applications.
     - [Groups Without a Prefix](#groups-without-a-prefix)
 - [Dispatching](#dispatching)
     - [Accessing Your Routes](#accessing-your-routes)
+- [Performance](#performance)
+    - [How to Cache Your Routes](#how-to-cache-your-routes)
+    - [Benchmarks](#benchmarks)
 - [Hide Script Name from URL](#hide-script-name-from-url)
     - [FrankenPHP](#frankenphp)
     - [NGINX](#nginx)
@@ -110,7 +116,7 @@ while (frankenphp_handle_request($handler)) {
 
 ## What is a Handler?
 
-You'll see the term **handler** mentioned throughout this document. But what does it mean? In this router, a handler is simply a reference to the function or method that will be executed when a route matches.
+You'll see the term **handler** mentioned throughout this document. But what does it mean? In Route2, a handler is simply a reference to the function or method that will be executed.
 
 You can define handlers in several ways:
 
@@ -167,26 +173,25 @@ Route2::any('/', 'handler');
 
 ## Route Parameters
 
-Sometimes you will need to capture segments of the URI within your route. For example, you may need to capture a user's ID from the URL. You may do so by defining route parameters:
+Often, you'll want to capture parts of the URL as variables—such as a user's ID or a post slug. Route parameters make this easy and flexible.
 
-> **Note:**  
-> - Enclose parameters in curly braces within your route path, like `/{param}` or `/{param}/`.
-> - Parameter names should use only letters, numbers, and underscores—no dashes or special characters.
-> - If a parameter is not the last segment in the route, it must be enclosed in forward slashes (e.g., `/posts/{post}/comments/{comment}`), not embedded within a segment.
->
-> **Examples:**  
-> - `/posts/{post}/comments/{comment}` &nbsp;✅&nbsp; *(valid)*  
-> - `/posts/{post}-comments/{comment}` &nbsp;❌&nbsp; *(invalid)*
+> **How to use parameters:**  
+> - Wrap parameter names in curly braces: `/{param}` or `/{param}/`.
+> - Use only letters, numbers, and underscores for parameter names—avoid dashes or special characters.
+> - If a parameter isn't the last segment, it must be separated by slashes (e.g., `/posts/{post}/comments/{comment}`), not embedded within another segment.
+>   - `/posts/{post}/comments/{comment}` &nbsp;✅&nbsp; *(valid)*  
+>   - `/posts/{post}-comments/{comment}` &nbsp;❌&nbsp; *(invalid)*
 
-You can define as many route parameters as required by your route:
+---
 
-```php
-function handler($post, $comment) {
-    echo $post . ' ' . $comment
-}
+> **Notice:**  
+> Route2 always prefers exact matches over parameterized routes.  
+> ```php
+> Route2::get('/somewhere/{any}', 'handler');
+> Route2::get('/somewhere/someplace', 'handler');
+> ```
+> If you visit `/somewhere/someplace`, the exact route (`/somewhere/someplace`) will be matched first, not the parameterized one.
 
-Route2::get('/posts/{post}/comments/{comment}', 'handler');
-```
 
 ### Required Parameters
 
@@ -196,11 +201,21 @@ These parameters must be provided or the route is skipped.
 Route2::get('/user/{id}', 'handler');
 ```
 
+You can define as many required parameters as required by your route:
+
+```php
+function handler($post, $comment) {
+    echo $post . ' ' . $comment
+}
+
+Route2::get('/posts/{post}/comments/{comment}', 'handler');
+```
+
 ### Optional Parameters
 
 Specify a route parameter that may not always be present in the URI. You may do so by placing a `?` mark after the parameter name.
 
->**Note**: Make sure to give the route's corresponding variable a default value:
+>**Note**: Should be the last segment. Make sure to give the route's corresponding variable a default value:
 
 ```php
 function handler($name = 'John') {
@@ -214,7 +229,7 @@ Route2::get('/user/{name?}', 'handler');
 
 Capture the whole segment including slashes by placing a `*` after the parameter name.
 
->**Note** Make sure to give the route's corresponding variable a default value:
+>**Note** Should be the last segment. Make sure to give the route's corresponding variable a default value:
 
 ```php
 function handler($any = null) {
@@ -237,9 +252,9 @@ Routes added after this method will inherit the expressions.
 Route2::expression([
     // By specifying #^ ... $# you are telling the expression to use regex
     'id' => '#^[0-9]+$#',
-    // Uses function to verify that the value of id is numeric
+    // Uses handler to verify that the value of id is numeric
     'id' => 'is_numeric',
-    // Uses function to transform the parameter value
+    // Uses handler to transform the parameter value
     'name' => 'strtoupper'
 ]);
 ```
@@ -248,7 +263,7 @@ Route2::expression([
 
 Middlewares are like filters or layers that process HTTP requests before and after they reach your application's core logic. Think of them as checkpoints—each middleware can inspect, modify, or even halt a request. For example, an authentication middleware might redirect unauthenticated users to a login page, while letting authenticated users continue.
 
-> **Note:** If a middleware [handler](#what-is-a-handler) returns `false`, the request will be halted and a 404 page will be displayed. Middleware are only executed when a matching route is found.
+> **Note:** Middleware are only executed when a matching route is found.
 
 ### How to Register Middleware
 
@@ -309,6 +324,67 @@ Route2::dispatch('POST', '/custom/route');
 The simplest way to access your routes is to put the file in your folder and run it.
 
 When you visit a URL like `http://your.site/yourscript.php/your/route`, the router will automatically adjust the path to `/your/route`.
+
+## Performance
+
+It's usually not the router that is the bottleneck of an application, hopefully.
+
+### How to Cache Your Routes
+
+To maximize performance, Route2 uses a tree-based algorithm for fast route lookups. However, rebuilding this tree on every request can slow down your application’s startup time. The solution? Cache the generated route tree!
+
+The compiled route tree in Route2 is just a collection of strings and arrays, you can easily serialize them for reuse. Here’s how you can implement a basic route cache:
+
+```php
+<?php
+
+require __DIR__.'/../vendor/autoload.php';
+
+use Wilaak\Http\Route2;
+
+function hello($world = 'World') {
+    echo "Hello, $world!";
+}
+
+function build_routes() {
+    Route2::get('/{world?}', 'hello');
+}
+
+$cacheFile = 'cache.php';
+if (file_exists($cacheFile)) {
+    // Load the cached route tree for instant boot
+    Route2::$routeTree = include $cacheFile;
+} else {
+    // Build routes and cache the tree for future requests
+    build_routes();
+    file_put_contents(
+        $cacheFile,
+        '<?php return ' . var_export(Route2::$routeTree, true) . ';'
+    );
+}
+
+Route2::dispatch();
+```
+
+By exporting the route tree to a PHP file, you let PHP’s OPcache handle the heavy lifting—making route loading nearly instantaneous on subsequent requests. This approach is both simple and highly efficient.
+
+### Benchmarks
+
+Here’s a quick look at Route2’s performance in different modes.
+
+- **Long Route:** The most complex route with multiple segments and parameters  
+- **Short Route:** A simple static route  
+- Benchmarks were run on FrankenPHP v1.5.0, PHP 8.4.6, Ubuntu Linux (WSL on Windows 11), Intel Core i5-12400, using `wrk` on the same machine.
+
+| **Mode**                    | **Routes** | **Long Route (req/s)** | **Short Route (req/s)** |
+|-----------------------------|:----------:|:------------------------:|:--------------------------:|
+| Route2 Worker Baseline  |     1      |           N/A            |        62,189 rps          |
+| Route2 Worker           |   178      |        49,991 rps        |        61,515 rps          |
+| Route2 Classic (cached) |   178      |        39,010 rps        |        43,250 rps          |
+| Route2 Classic Baseline |     1      |           N/A            |        39,654 rps          |
+| Route2 Classic          |   178      |        13,900 rps        |        14,045 rps          |
+
+For details on how to run these benchmarks yourself, see the `benchmark` folder.
 
 ## Hide Script Name from URL
 
