@@ -9,11 +9,11 @@ use Closure;
  */
 class Route2
 {
-    protected string $requestMethod;
-    protected string $requestUri;
-    protected array $requestUriParts;
+    private string $requestMethod;
+    private string $requestUri;
+    private array $requestUriParts;
 
-    protected array $ctx = [
+    private array $ctx = [
         'groupPrefix'      => '',
         'beforeMiddleware' => [],
         'afterMiddleware'  => [],
@@ -113,15 +113,15 @@ class Route2
 
     public function group(?string $prefix = null, ?callable $callback = null): void
     {
+        if ($prefix !== null && !str_starts_with($this->requestUri, $this->ctx['groupPrefix'] . $prefix)) {
+            return;
+        }
+        $previousContext = $this->ctx;
         if ($prefix !== null) {
             $this->ctx['groupPrefix'] .= $prefix;
         }
-        if ($prefix !== null && !str_starts_with($this->requestUri, $this->ctx['groupPrefix'])) {
-            return;
-        }
-        $previousctx = $this->ctx;
         $callback($this);
-        $this->ctx = $previousctx;
+        $this->ctx = $previousContext;
     }
 
     private function getHandler(array|callable $handler, array $params = []): callable
