@@ -1,0 +1,19 @@
+{
+    "name": "wilaak/route2",
+    "description": "A simple routing library for PHP web applications.",
+    "type": "library",
+    "license": "WTFPL",
+    "authors": [
+        {
+            "name": "William",
+            "email": "54738571+Wilaak@users.noreply.github.com"
+        }
+    ],
+    "minimum-stability": "stable",
+    "autoload": {
+        "psr-4": {
+            "Wilaak\\Http\\": "src/"
+        }
+    },
+    "require": {}
+}
