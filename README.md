@@ -15,6 +15,7 @@ A simple routing library for PHP web services.
 
 - [Install](#install)
 - [Quick Start](#quick-start)
+- [How does it work?](#how-does-it-work)
 - [What is a Handler?](#what-is-a-handler)
     - [Hooking Into the Handler](#hooking-into-the-handler)
 - [Basic Routing](#basic-routing)
@@ -58,134 +59,41 @@ require '../vendor/autoload.php';
 
 use Wilaak\Http\Route2;
 
-// Helper function to send JSON responses
-function send_json_response($data, int $status = 200): void {
+// Simple JSON response helper
+function send_json($data, int $status = 200): void {
     header('Content-Type: application/json');
     http_response_code($status);
     echo json_encode($data);
 }
 
-// Example controllers
-class UserController {
-    public function index() {
-        send_json_response(['users' => ['Alice', 'Bob', 'Charlie']]);
-    }
-    public function show($id) {
-        send_json_response(['user' => ['id' => $id, 'name' => 'User'.$id]]);
-    }
-}
-
-class AuthController {
-    public function login() {
-        send_json_response(['message' => 'Logged in!']);
-    }
-    public function logout() {
-        send_json_response(['message' => 'Logged out!']);
-    }
-}
-
-// Instantiate the router
 $router = new Route2();
 
-// Global middleware
-$router->before(function() {
-    header('X-Powered-By: Route2');
-});
-
-// API group with versioning and authentication middleware
-$router->group('/api/v1', function($router) {
-    // Authentication middleware for all /api/v1 routes
-    $router->before(function() {
-        // Example: check for API key (pseudo-code)
-        // if (!isset($_SERVER['HTTP_X_API_KEY'])) {
-        //     send_json_response(['error' => 'Unauthorized'], 401);
-        //     exit;
-        // }
-    });
-
-    // User routes
-    $router->group('/users', function($router) {
-        $router->get('/',     [UserController::class, 'index']);
-        $router->get('/{id}', [UserController::class, 'show']);
-    });
-
-    // Auth routes
-    $router->post('/login',  [AuthController::class, 'login']);
-    $router->post('/logout', [AuthController::class, 'logout']);
-
-    // Fallback for API
-    if ($router->allowedMethods) {
-        header('Allow: ' . implode(', ', $router->allowedMethods));
-        send_json_response([
-            'error' => 'Method Not Allowed',
-            'allowed_methods' => $router->allowedMethods
-        ], 405);
-    } else {
-        send_json_response(['error' => 'Not Found'], 404);
-    }
-    exit;
-});
-
-// Admin panel group with HTML responses and authentication middleware
-$router->group('/admin', function($router) {
-    // Example admin authentication middleware
-    $router->before(function() {
-        // if (!isset($_SESSION['admin'])) {
-        //     http_response_code(403);
-        //     echo '<h1>Forbidden</h1>';
-        //     exit;
-        // }
-    });
-
-    $router->get('/dashboard', function () {
-        ?>
-            <h1>Admin Dashboard</h1>
-            <p>Welcome to the admin dashboard!</p>
-        <?php
-    });
-
+// Example API group
+$router->group('/api', function ($router) {
     $router->get('/users', function () {
-        ?>
-            <h1>Admin: User Management</h1>
-            <ul>
-                <li>Alice</li>
-                <li>Bob</li>
-                <li>Charlie</li>
-            </ul>
-        <?php
+        send_json(['users' => ['Alice', 'Bob']]);
+    });
+    $router->post('/login', function () {
+        send_json(['message' => 'Logged in!']);
     });
 });
 
-// Public site routes
-$router->get('/', function() {
-    ?>
-        <h1>Welcome to the Home Page</h1>
-        <p><a href="/about">About Us</a></p>
-    <?php
+// Simple HTML routes
+$router->get('/', function () {
+    echo "<h1>Home</h1>";
+});
+$router->get('/about', function () {
+    echo "<h1>About</h1>";
 });
 
-$router->get('/about', function() {
-    ?>
-        <h1>About Us</h1>
-        <p>Information about the company.</p>
-    <?php
-});
-
-// Global fallback for unmatched routes
+// Fallback for unmatched routes
 if ($router->allowedMethods) {
     header('Allow: ' . implode(', ', $router->allowedMethods));
     http_response_code(405);
-    ?>
-        <h1>Method Not Allowed</h1>
-        <p>The requested method is not allowed for this URL.</p>
-        <p>Allowed methods: <?=implode(', ', $router->allowedMethods)?></p>
-    <?php
+    echo "<h1>Method Not Allowed</h1>";
 } else {
     http_response_code(404);
-    ?>
-        <h1>Not Found</h1>
-        <p>The requested URL was not found on this server.</p>
-    <?php
+    echo "<h1>Not Found</h1>";
 }
 
 ```
