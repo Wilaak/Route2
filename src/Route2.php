@@ -9,8 +9,8 @@ use Closure;
  */
 class Route2
 {
-    private string $requestMethod;
-    private string $requestUri;
+    public string $requestMethod;
+    public string $requestUri;
     private array $requestUriParts;
 
     private array $ctx = [
@@ -20,6 +20,8 @@ class Route2
         'paramExpressions' => [],
     ];
 
+    public array $allowedMethods;
+
     private ?Closure $handlerHook;
 
     public function __construct(?string $requestMethod = null, ?string $requestUri = null)
@@ -27,17 +29,13 @@ class Route2
         $this->requestMethod = $requestMethod ?? $_SERVER['REQUEST_METHOD'];
         $this->requestUri = $requestUri ?? $this->getRelativeRequestUri();
         $this->requestUriParts = explode('/', $this->requestUri);
+        $this->allowedMethods = [];
     }
 
     public function match(array $methods, string $uri, array|callable $handler): void
     {
-        if (!in_array($this->requestMethod, $methods)) {
-            return;
-        }
-
-        $fullUri = $this->ctx['groupPrefix'] . $uri;
         $isWildcard = str_ends_with($uri, '*}');
-        $uriParts = explode('/', $fullUri);
+        $uriParts = explode('/', $this->ctx['groupPrefix'] . $uri);
         if (
             (!$isWildcard && count($this->requestUriParts) !== count($uriParts)) ||
             ($isWildcard && count($this->requestUriParts) < count($uriParts))
@@ -49,7 +47,6 @@ class Route2
             }
         }
 
-        $isOptional = str_ends_with($uri, '?}');
         $params = [];
         foreach ($uriParts as $index => $part) {
             if (str_starts_with($part, '{') && str_ends_with($part, '}')) {
@@ -59,6 +56,7 @@ class Route2
         }
 
         $lastParam = array_key_last($params);
+        $isOptional = str_ends_with($uri, '?}');
         if ($isOptional && isset($lastParam) && empty($params[$lastParam])) {
             unset($params[$lastParam]);
         }
@@ -67,6 +65,11 @@ class Route2
         }
         if ($isWildcard) {
             $params[$lastParam] = implode('/', array_slice($this->requestUriParts, count($uriParts) - 1));
+        }
+
+        $this->allowedMethods = array_unique(array_merge($this->allowedMethods, $methods));
+        if (!in_array($this->requestMethod, $methods)) {
+            return;
         }
 
         foreach ($this->ctx['paramExpressions'] as $paramName => $expression) {
@@ -90,11 +93,17 @@ class Route2
         }
 
         foreach ($this->ctx['beforeMiddleware'] as $middleware) {
-            $this->getHandler($middleware)();
+            $result = $this->getHandler($middleware)();
+            if ($result === false) {
+                exit();
+            }
         }
         $this->getHandler($handler, $params)();
         foreach ($this->ctx['afterMiddleware'] as $middleware) {
-            $this->getHandler($middleware)();
+            $result = $this->getHandler($middleware)();
+            if ($result === false) {
+                exit();
+            }
         }
         exit();
     }
@@ -126,7 +135,7 @@ class Route2
 
     private function getHandler(array|callable $handler, array $params = []): callable
     {
-        if ($this->handlerHook) {
+        if (isset($this->handlerHook)) {
             return ($this->handlerHook)($handler, $params);
         }
         return is_array($handler)

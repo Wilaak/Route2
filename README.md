@@ -58,15 +58,71 @@ require '../vendor/autoload.php';
 
 use Wilaak\Http\Route2;
 
+function send_json_response($data, int $status = 200): void {
+    header('Content-Type: application/json');
+    http_response_code($status);
+    echo json_encode($data);
+}
+
+// Instantiate the router, it will automatically detect the request method and URI unless you provide them
+// $router = new Route2($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);
 $router = new Route2();
 
-$router->get('/{world?}', function($world = 'World') {
-    ?><h1>Hello, <?=$world?>!</h1><?php
+$router->before(function() {
+    header('X-Powered-By: Route2');
 });
 
-http_response_code(404);
-?><h1>404 Page Not Found</h1>
+$router->group('/api', function($router) {
+    $router->get('/hello/{name?}', function($name = 'World') {
+        send_json_response(['message' => "Hello, $name!"]);
+    });
+
+    // Handle cases where the method is not allowed or the route is not found for all requests that begin with /api
+    if ($router->allowedMethods) {
+        header('Allow: ' . implode(', ', $router->allowedMethods));
+        send_json_response([
+            'error' => 'Method Not Allowed',
+            'allowed_methods' => $router->allowedMethods
+        ], 405);
+    } else {
+        send_json_response(['error' => 'Not Found'], 404);
+    }
+    exit;
+});
+
+$router->group('/admin', function($router) {
+    $router->get('/dashboard', function () {
+        ?>
+            <h1>Admin Dashboard</h1>
+            <p>Welcome to the admin dashboard!</p>
+        <?php
+    });
+});
+
+// Global fallback for routes that do not match any defined route
+if ($router->allowedMethods) {
+    header('Allow: ' . implode(', ', $router->allowedMethods));
+    http_response_code(405);
+    ?>
+        <h1>Method Not Allowed</h1>
+        <p>The requested method is not allowed for this URL.</p>
+        <p>Allowed methods: <?=implode(', ', $router->allowedMethods)?></p>
+    <?php
+} else {
+    http_response_code(404);
+    ?>
+        <h1>Not Found</h1>
+        <p>The requested URL was not found on this server.</p>
+    <?php
+}
+
 ```
+
+## How does it work?
+
+Route2 follows a very dumb and simple approach: when you define routes, each incoming request is checked against your route patterns in the order they were registered. As soon as a matching route is found it executes the associated handlers, and then it dies—ensuring only the first match is handled.
+
+Could it be more optimized? Yes. Is it fast enough for most use cases? Yes.
 
 ## What is a Handler?
 
@@ -225,7 +281,7 @@ $router->expression([
 
 Middlewares are like filters or layers that process HTTP requests before and after they reach your application's core logic. Think of them as checkpoints—each middleware can inspect, modify, or even halt a request. For example, an authentication middleware might redirect unauthenticated users to a login page, while letting authenticated users continue.
 
-> **Note**: Middleware are only executed when a matching route is found.
+> **Note**: Middleware are only executed when a matching route is found. If a middleware handler returns `false`, the script will terminate.
 
 You can add middleware to your routes using the `before()` and `after()` methods. These methods accept a [handler](#what-is-a-handler).
 
