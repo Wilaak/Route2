@@ -1,6 +1,6 @@
 {
     "name": "wilaak/route2",
-    "description": "A simple routing library for PHP web applications.",
+    "description": "A simple routing library for PHP web services.",
     "type": "library",
     "license": "WTFPL",
     "authors": [

@@ -5,7 +5,7 @@ namespace Wilaak\Http;
 use Closure;
 
 /**
- * A simple routing library for PHP web applications.
+ * A simple routing library for PHP web services.
  */
 class Route2
 {

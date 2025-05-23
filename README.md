@@ -1,6 +1,6 @@
 # Route2 🛣️
 
-A simple routing library for PHP web applications.
+A simple routing library for PHP web services.
 
 ### Features
 
