@@ -150,7 +150,7 @@ class Route2
 
     public function getRelativeRequestUri(): string
     {
-        $uri = strtok($_SERVER['REQUEST_URI'], '?');
+        $uri = urldecode(strtok($_SERVER['REQUEST_URI'], '?'));
         $script = $_SERVER['SCRIPT_NAME'];
         if (str_starts_with($uri, $script)) {
             $uri = substr($uri, strlen($script));
