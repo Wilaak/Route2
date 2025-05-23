@@ -95,17 +95,17 @@ class Route2
         foreach ($this->ctx['beforeMiddleware'] as $middleware) {
             $result = $this->getHandler($middleware)();
             if ($result === false) {
-                exit();
+                exit;
             }
         }
         $this->getHandler($handler, $params)();
         foreach ($this->ctx['afterMiddleware'] as $middleware) {
             $result = $this->getHandler($middleware)();
             if ($result === false) {
-                exit();
+                exit;
             }
         }
-        exit();
+        exit;
     }
 
     public function get(string $uri, array|callable $handler): void { $this->match(['GET'], $uri, $handler); }

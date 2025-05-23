@@ -58,26 +58,62 @@ require '../vendor/autoload.php';
 
 use Wilaak\Http\Route2;
 
+// Helper function to send JSON responses
 function send_json_response($data, int $status = 200): void {
     header('Content-Type: application/json');
     http_response_code($status);
     echo json_encode($data);
 }
 
-// Instantiate the router, it will automatically detect the request method and URI unless you provide them
-// $router = new Route2($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);
+// Example controllers
+class UserController {
+    public function index() {
+        send_json_response(['users' => ['Alice', 'Bob', 'Charlie']]);
+    }
+    public function show($id) {
+        send_json_response(['user' => ['id' => $id, 'name' => 'User'.$id]]);
+    }
+}
+
+class AuthController {
+    public function login() {
+        send_json_response(['message' => 'Logged in!']);
+    }
+    public function logout() {
+        send_json_response(['message' => 'Logged out!']);
+    }
+}
+
+// Instantiate the router
 $router = new Route2();
 
+// Global middleware
 $router->before(function() {
     header('X-Powered-By: Route2');
 });
 
-$router->group('/api', function($router) {
-    $router->get('/hello/{name?}', function($name = 'World') {
-        send_json_response(['message' => "Hello, $name!"]);
+// API group with versioning and authentication middleware
+$router->group('/api/v1', function($router) {
+    // Authentication middleware for all /api/v1 routes
+    $router->before(function() {
+        // Example: check for API key (pseudo-code)
+        // if (!isset($_SERVER['HTTP_X_API_KEY'])) {
+        //     send_json_response(['error' => 'Unauthorized'], 401);
+        //     exit;
+        // }
     });
 
-    // Handle cases where the method is not allowed or the route is not found for all requests that begin with /api
+    // User routes
+    $router->group('/users', function($router) {
+        $router->get('/',     [UserController::class, 'index']);
+        $router->get('/{id}', [UserController::class, 'show']);
+    });
+
+    // Auth routes
+    $router->post('/login',  [AuthController::class, 'login']);
+    $router->post('/logout', [AuthController::class, 'logout']);
+
+    // Fallback for API
     if ($router->allowedMethods) {
         header('Allow: ' . implode(', ', $router->allowedMethods));
         send_json_response([
@@ -90,16 +126,52 @@ $router->group('/api', function($router) {
     exit;
 });
 
+// Admin panel group with HTML responses and authentication middleware
 $router->group('/admin', function($router) {
+    // Example admin authentication middleware
+    $router->before(function() {
+        // if (!isset($_SESSION['admin'])) {
+        //     http_response_code(403);
+        //     echo '<h1>Forbidden</h1>';
+        //     exit;
+        // }
+    });
+
     $router->get('/dashboard', function () {
         ?>
             <h1>Admin Dashboard</h1>
             <p>Welcome to the admin dashboard!</p>
         <?php
     });
+
+    $router->get('/users', function () {
+        ?>
+            <h1>Admin: User Management</h1>
+            <ul>
+                <li>Alice</li>
+                <li>Bob</li>
+                <li>Charlie</li>
+            </ul>
+        <?php
+    });
 });
 
-// Global fallback for routes that do not match any defined route
+// Public site routes
+$router->get('/', function() {
+    ?>
+        <h1>Welcome to the Home Page</h1>
+        <p><a href="/about">About Us</a></p>
+    <?php
+});
+
+$router->get('/about', function() {
+    ?>
+        <h1>About Us</h1>
+        <p>Information about the company.</p>
+    <?php
+});
+
+// Global fallback for unmatched routes
 if ($router->allowedMethods) {
     header('Allow: ' . implode(', ', $router->allowedMethods));
     http_response_code(405);
@@ -298,6 +370,8 @@ $router->after('your_middleware_handler');
 ## Route Groups
 
 Route groups make it easy to organize related routes and share common attributes—such as middleware or parameter expressions—across multiple routes. Groups can be nested, and nested groups automatically inherit attributes from their parent, much like variable scopes.
+
+> **Note**: A route group only applies if the request URI begins with the group's prefix. If it doesn't, the group and its routes will be skipped.
 
 To group routes under a common prefix, use the `group()` method. All routes defined within the group will share the specified prefix and any attributes you assign:
 
