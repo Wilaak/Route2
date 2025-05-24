@@ -32,7 +32,7 @@ class Route2
         $this->allowedMethods = [];
     }
 
-    public function match(array $methods, string $uri, array|callable $handler): void
+    public function match(array $methods, string $uri, $handler): void
     {
         $isWildcard = str_ends_with($uri, '*}');
         $uriParts = explode('/', $this->ctx['groupPrefix'] . $uri);
@@ -108,16 +108,16 @@ class Route2
         exit;
     }
 
-    public function get(string $uri, array|callable $handler): void { $this->match(['GET'], $uri, $handler); }
-    public function post(string $uri, array|callable $handler): void { $this->match(['POST'], $uri, $handler); }
-    public function put(string $uri, array|callable $handler): void { $this->match(['PUT'], $uri, $handler); }
-    public function delete(string $uri, array|callable $handler): void { $this->match(['DELETE'], $uri, $handler); }
-    public function patch(string $uri, array|callable $handler): void { $this->match(['PATCH'], $uri, $handler); }
-    public function options(string $uri, array|callable $handler): void { $this->match(['OPTIONS'], $uri, $handler); }
-    public function form(string $uri, array|callable $handler): void { $this->match(['GET', 'POST'], $uri, $handler); }
-    public function any(string $uri, array|callable $handler): void { $this->match(['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], $uri, $handler); }
-    public function before(array|callable $middleware): void { $this->ctx['beforeMiddleware'][] = $middleware; }
-    public function after(array|callable $middleware): void { $this->ctx['afterMiddleware'][] = $middleware; }
+    public function get(string $uri, mixed $handler): void { $this->match(['GET'], $uri, $handler); }
+    public function post(string $uri, mixed $handler): void { $this->match(['POST'], $uri, $handler); }
+    public function put(string $uri, mixed $handler): void { $this->match(['PUT'], $uri, $handler); }
+    public function delete(string $uri, mixed $handler): void { $this->match(['DELETE'], $uri, $handler); }
+    public function patch(string $uri, mixed $handler): void { $this->match(['PATCH'], $uri, $handler); }
+    public function options(string $uri, mixed $handler): void { $this->match(['OPTIONS'], $uri, $handler); }
+    public function form(string $uri, mixed $handler): void { $this->match(['GET', 'POST'], $uri, $handler); }
+    public function any(string $uri, mixed $handler): void { $this->match(['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], $uri, $handler); }
+    public function before(mixed $middleware): void { $this->ctx['beforeMiddleware'][] = $middleware; }
+    public function after(mixed $middleware): void { $this->ctx['afterMiddleware'][] = $middleware; }
     public function expression(array $expression): void { $this->ctx['paramExpressions'] += $expression; }
 
     public function group(?string $prefix = null, ?callable $callback = null): void
@@ -133,7 +133,7 @@ class Route2
         $this->ctx = $previousContext;
     }
 
-    private function getHandler(array|callable $handler, array $params = []): callable
+    private function getHandler(mixed $handler, array $params = []): callable
     {
         if (isset($this->handlerHook)) {
             return ($this->handlerHook)($handler, $params);

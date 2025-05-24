@@ -4,12 +4,12 @@ A simple routing library for PHP web services.
 
 ### Features
 
-- **Flexible URLs** Support for required, optional, and wildcard segments.
-- **Parameter Validation** Filter and transform parameters with regex or custom logic.
-- **Middleware** Add logic before and after route handlers.
-- **Route Groups** Organize and share attributes across routes.
-- **Handler Hooks** Intercept and customize how route handlers are executed.
-- **Lightweight** Single-file, dependency-free minimalistic design.
+- 🧭 **Flexible URLs** Support for required, optional, and wildcard segments.
+- 🛡️ **Parameter Validation** Filter and transform parameters with regex or custom logic.
+- 🧩 **Middleware** Add logic before and after route handlers.
+- 🗂️ **Route Groups** Organize and share attributes across routes.
+- 🪝 **Handler Hooks** Intercept how route handlers are executed. (Integrate with DI-Containers)
+- ⚡ **Lightweight** Single-file, dependency-free and ~160 lines of code.
 
 ## Table of Contents
 
@@ -100,9 +100,9 @@ if ($router->allowedMethods) {
 
 ## How does it work?
 
-It follows a very dumb and simple approach: each request is checked against your routes in the order you defined them. As soon as it finds a match, it runs the handler and terminates so only the first matching route is processed.
+It follows a very dumb and simple approach: each request is checked against your routes in the order you defined them. As soon as it finds a match, it runs the handler and terminates, so only the first matching route is processed.
 
-Could it be more efficient? Sure. But for most projects, this approach is more than fast enough—it's unlikely to ever be your actual bottleneck! If you need to squeeze out some extra performance you can utilize [Route Groups](#route-groups).
+Could it be more efficient? Sure. But for most projects, this approach is more than fast enough—it's unlikely to ever be your actual bottleneck! And if you absolutely need to squeeze out some extra performance you can utilize prefixed [Route Groups](#route-groups).
 
 ## What is a Handler?
 
@@ -141,7 +141,7 @@ You can take control over how handlers are run by setting a handler hook. This l
 To do this, use the `setHandlerHook()` method. The hook gives you access to the handler and its parameters, so you can decide exactly how the handler should be executed:
 
 ```php
-$router->setHandlerHook(function(array|callable $handler, array $params): callable {
+$router->setHandlerHook(function(mixed $handler, array $params): callable {
     // Add your custom logic here (e.g., resolve dependencies, log calls, etc.)
     return is_array($handler)
         ? fn() => (new $handler[0])->{$handler[1]}(...$params)
@@ -285,10 +285,12 @@ To group routes under a common prefix, use the `group()` method. All routes defi
 
 ```php
 $router->group('/admin', function ($router) {
-    // This middleware only affect routes within this group and its children
-    $router->before('admin_middleware_handler');
-    $router->get('/dashboard', 'admin_dashboard_handler');
-    $router->post('/settings',  'admin_settings_handler');
+    // This middleware only affect routes within this group and any nested groups
+    $router->before([AdminMiddleware::class, 'handle']);
+    // It may be ugly, but by passing an empty string it will only use the prefix (e.g /admin)
+    $router->get('',           [AdminController::class, 'index']);
+    $router->get('/dashboard', [AdminController::class, 'dashboard']);
+    $router->post('/settings', [AdminController::class, 'settings']);
 });
 ```
 
