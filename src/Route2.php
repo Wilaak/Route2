@@ -82,7 +82,7 @@ class Route2
                 }
                 continue;
             }
-            $result = self::getHandler($expression, [$params[$paramName]])();
+            $result = $this->getHandler($expression, [$params[$paramName]])();
             if ($result === false) {
                 return;
             }
