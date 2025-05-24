@@ -100,9 +100,9 @@ if ($router->allowedMethods) {
 
 ## How does it work?
 
-Route2 follows a very dumb and simple approach: when you define routes, each incoming request is checked against your route patterns in the order they were registered. As soon as a matching route is found it executes the associated handlers, and then it dies—ensuring only the first match is handled.
+It follows a very dumb and simple approach: each request is checked against your routes in the order you defined them. As soon as it finds a match, it runs the handler and terminates so only the first matching route is processed.
 
-Could it be more optimized? Yes. Is it fast enough for most use cases? Yes.
+Could it be more efficient? Sure. But for most projects, this approach is more than fast enough—it's unlikely to ever be your actual bottleneck! If you need to squeeze out some extra performance you can utilize [Route Groups](#route-groups).
 
 ## What is a Handler?
 
@@ -136,9 +136,9 @@ You can define handlers in a variety of ways:
 
 ### Hooking Into the Handler
 
-You can intercept or customize how handlers are executed by using a handler hook. This is especially useful for integrating features like dependency injection, logging, or custom pre-processing.
+You can take control over how handlers are run by setting a handler hook. This lets you plug in things like dependency injection, logging, or any custom logic before your route handler is called.
 
-To set a handler hook, use the `setHandlerHook()` method. The hook receives the handler and its parameters, allowing you to control how the handler is invoked:
+To do this, use the `setHandlerHook()` method. The hook gives you access to the handler and its parameters, so you can decide exactly how the handler should be executed:
 
 ```php
 $router->setHandlerHook(function(array|callable $handler, array $params): callable {
@@ -189,7 +189,7 @@ $router->any('/', 'handler');
 
 ## Route Parameters
 
-Often, you'll want to capture parts of the URL as variables—such as a user's ID or a post slug. Route parameters make this easy and flexible.
+Route parameters let you capture parts of the URL.
 
 ### Required Parameters
 
@@ -259,7 +259,7 @@ $router->expression([
 
 ## Middleware
 
-Middlewares are like filters or layers that process HTTP requests before and after they reach your application's core logic. Think of them as checkpoints—each middleware can inspect, modify, or even halt a request. For example, an authentication middleware might redirect unauthenticated users to a login page, while letting authenticated users continue.
+Middlewares are like filters or layers that process HTTP requests before and after they reach your application's core logic. Think of them as checkpoints—each middleware can inspect, modify, or halt a request. For example, an authentication middleware might redirect unauthenticated users to a login page, while letting authenticated users continue.
 
 > **Note**: Middleware are only executed when a matching route is found. If a middleware handler returns `false`, the script will terminate.
 
@@ -277,9 +277,9 @@ $router->after('your_middleware_handler');
 
 ## Route Groups
 
-Route groups make it easy to organize related routes and share common attributes—such as middleware or parameter expressions—across multiple routes. Groups can be nested, and nested groups automatically inherit attributes from their parent, much like variable scopes.
+Route groups make it easy to organize related routes and share common attributes. Groups can be nested, and nested groups automatically inherit attributes from their parent, much like variable scopes.
 
-> **Note**: A route group only applies if the request URI begins with the group's prefix. If it doesn't, the group and its routes will be skipped.
+> **Tip**: For applications with many routes, using prefixed groups can improve performance as it will skip evaluating all routes in the group if the request URI doesn't start with the prefix.
 
 To group routes under a common prefix, use the `group()` method. All routes defined within the group will share the specified prefix and any attributes you assign:
 
