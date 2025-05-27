@@ -76,7 +76,7 @@ class Route2
             if (!isset($params[$paramName])) {
                 continue;
             }
-            if (str_starts_with($expression, '#^')) {
+            if (is_string($expression) && str_starts_with($expression, '#^')) {
                 if (!preg_match($expression, $params[$paramName])) {
                     return;
                 }
