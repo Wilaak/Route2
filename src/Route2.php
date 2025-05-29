@@ -20,7 +20,7 @@ class Route2
         'paramExpressions' => [],
     ];
 
-    public array $allowedMethods;
+    public array $allowedMethods = [];
 
     private ?Closure $handlerHook;
 
@@ -29,7 +29,6 @@ class Route2
         $this->requestMethod = $requestMethod ?? $_SERVER['REQUEST_METHOD'];
         $this->requestUri = $requestUri ?? $this->getRelativeRequestUri();
         $this->requestUriParts = explode('/', $this->requestUri);
-        $this->allowedMethods = [];
     }
 
     public function match(array $methods, string $uri, $handler): void
@@ -120,13 +119,18 @@ class Route2
     public function after(mixed $middleware): void { $this->ctx['afterMiddleware'][] = $middleware; }
     public function expression(array $expression): void { $this->ctx['paramExpressions'] += $expression; }
 
-    public function group(?string $prefix = null, ?callable $callback = null): void
+    public function group(string $prefix, callable $callback): void
     {
-        if ($prefix !== null && !str_starts_with($this->requestUri, $this->ctx['groupPrefix'] . $prefix)) {
-            return;
+        if ($prefix !== '') {
+            $uriParts = explode('/', $this->ctx['groupPrefix'] . $prefix);
+            foreach ($uriParts as $index => $part) {
+                if ($part !== $this->requestUriParts[$index] && !str_starts_with($part, '{')) {
+                    return;
+                }
+            }
         }
         $previousContext = $this->ctx;
-        if ($prefix !== null) {
+        if ($prefix !== '') {
             $this->ctx['groupPrefix'] .= $prefix;
         }
         $callback($this);
@@ -152,8 +156,13 @@ class Route2
     {
         $uri = urldecode(strtok($_SERVER['REQUEST_URI'], '?'));
         $script = $_SERVER['SCRIPT_NAME'];
-        if (str_starts_with($uri, $script)) {
+        $scriptDir = rtrim(dirname($script), '/\\');
+        if ($uri === $script) {
+            $uri = '/';
+        } elseif (str_starts_with($uri, $script)) {
             $uri = substr($uri, strlen($script));
+        } elseif ($scriptDir !== '/' && str_starts_with($uri, $scriptDir)) {
+            $uri = substr($uri, strlen($scriptDir));
         }
         return $uri === '' ? '/' : $uri;
     }

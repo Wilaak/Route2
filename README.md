@@ -9,7 +9,7 @@ A simple routing library for PHP web services.
 - 🧩 **Middleware** Add logic before and after route handlers.
 - 🗂️ **Route Groups** Organize and share attributes across routes.
 - 🪝 **Handler Hooks** Intercept how route handlers are executed. (Integrate with DI-Containers)
-- ⚡ **Lightweight** Single-file, dependency-free and ~160 lines of code.
+- ⚡ **Lightweight** Single-file, dependency-free and only ~170 lines of code.
 
 ## Table of Contents
 
@@ -60,7 +60,7 @@ require '../vendor/autoload.php';
 use Wilaak\Http\Route2;
 
 // Simple JSON response helper
-function send_json($data, int $status = 200): void {
+function send_json(mixed $data, int $status = 200) {
     header('Content-Type: application/json');
     http_response_code($status);
     echo json_encode($data);
@@ -68,7 +68,6 @@ function send_json($data, int $status = 200): void {
 
 $router = new Route2();
 
-// Example API group
 $router->group('/api', function ($router) {
     $router->get('/users', function () {
         send_json(['users' => ['Alice', 'Bob']]);
@@ -78,12 +77,11 @@ $router->group('/api', function ($router) {
     });
 });
 
-// Simple HTML routes
 $router->get('/', function () {
     echo "<h1>Home</h1>";
 });
-$router->get('/about', function () {
-    echo "<h1>About</h1>";
+$router->get('/{world?}', function (string $world = 'World') {
+    echo "<h1>Hello, $world!</h1>";
 });
 
 // Fallback for unmatched routes
@@ -95,14 +93,13 @@ if ($router->allowedMethods) {
     http_response_code(404);
     echo "<h1>Not Found</h1>";
 }
-
-```
+``` 
 
 ## How does it work?
 
-It follows a very dumb and simple approach: each request is checked against your routes in the order you defined them. As soon as it finds a match, it runs the handler and terminates, so only the first matching route is processed.
+It follows a very dumb and simple approach: each request is checked against the routes in the order they were defined. As soon as it finds a match, it runs the associated handlers and terminates, so only the first matching route is processed.
 
-Could it be more efficient? Sure. But for most projects, this approach is more than fast enough—it's unlikely to ever be your actual bottleneck! And if you absolutely need to squeeze out some extra performance you can utilize prefixed [Route Groups](#route-groups).
+>**Tip**: You can utilize prefixed [Route Groups](#route-groups) if you want to further optimize this process.
 
 ## What is a Handler?
 
@@ -141,7 +138,7 @@ You can take control over how handlers are run by setting a handler hook. This l
 To do this, use the `setHandlerHook()` method. The hook gives you access to the handler and its parameters, so you can decide exactly how the handler should be executed:
 
 ```php
-$router->setHandlerHook(function(mixed $handler, array $params): callable {
+$router->setHandlerHook(function (mixed $handler, array $params): callable {
     // Add your custom logic here (e.g., resolve dependencies, log calls, etc.)
     return is_array($handler)
         ? fn() => (new $handler[0])->{$handler[1]}(...$params)
@@ -250,9 +247,9 @@ Routes added after this method will inherit the expressions.
 $router->expression([
     // By specifying #^ ... $# you are telling the expression to use regex
     'id' => '#^[0-9]+$#',
-    // Uses handler to verify that the value of id is numeric
+    // A handler to verify that the value of id is numeric
     'id' => 'is_numeric',
-    // Uses handler to transform the parameter value
+    // A handler to transform the parameter value
     'name' => 'strtoupper'
 ]);
 ```
@@ -294,10 +291,25 @@ $router->group('/admin', function ($router) {
 });
 ```
 
-You can also create a group without a prefix by omitting the first argument and using the `callback` named argument. This is useful for sharing route attributes without affecting the route path:
+You can also include parameters in group prefixes.
+
+>**Note**: These parameters are not validated at the group level, they are simply forwarded to the routes defined within the group.
 
 ```php
-$router->group(callback: function ($router) {
+$router->group('/customers/{customerId}', function ($router) {
+    $router->get('', function ($customerId) {
+        // ...
+    });
+    $router->get('/billing', function ($customerId) {
+        // ...
+    });
+});
+```
+
+You can also create a group without a prefix by providing an empty string. This is useful for sharing route attributes without affecting the route path:
+
+```php
+$router->group('', function ($router) {
     // ...
 });
 ```
