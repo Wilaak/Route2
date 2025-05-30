@@ -65,6 +65,9 @@ class Route2
         if ($isWildcard) {
             $params[$lastParam] = implode('/', array_slice($this->requestUriParts, count($uriParts) - 1));
         }
+        if ($isWildcard && empty($params[$lastParam])) {
+            unset($params[$lastParam]);
+        }
 
         $this->allowedMethods = array_unique(array_merge($this->allowedMethods, $methods));
         if (!in_array($this->requestMethod, $methods)) {
@@ -124,9 +127,11 @@ class Route2
         if ($prefix !== '') {
             $uriParts = explode('/', $this->ctx['groupPrefix'] . $prefix);
             foreach ($uriParts as $index => $part) {
-                if ($part !== $this->requestUriParts[$index] && !str_starts_with($part, '{')) {
-                    return;
-                }
+                if (
+                    isset($this->requestUriParts[$index])
+                    && $part !== $this->requestUriParts[$index]
+                    && !str_starts_with($part, '{')
+                ) return;
             }
         }
         $previousContext = $this->ctx;
