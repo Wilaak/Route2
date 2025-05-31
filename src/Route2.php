@@ -31,7 +31,7 @@ class Route2
         $this->requestUriParts = explode('/', $this->requestUri);
     }
 
-    public function match(array $methods, string $uri, $handler): void
+    public function match(array $methods, string $uri, mixed $handler): void
     {
         $isWildcard = str_ends_with($uri, '*}');
         $uriParts = explode('/', $this->ctx['groupPrefix'] . $uri);
@@ -50,7 +50,7 @@ class Route2
         foreach ($uriParts as $index => $part) {
             if (str_starts_with($part, '{') && str_ends_with($part, '}')) {
                 $paramName = trim($part, '{}?*');
-                $params[$paramName] = $this->requestUriParts[$index] ?? null;
+                $params[$paramName] = $this->requestUriParts[$index];
             }
         }
 
