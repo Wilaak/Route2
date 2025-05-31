@@ -22,7 +22,7 @@ class Route2
 
     public array $allowedMethods = [];
 
-    private ?Closure $handlerHook;
+    private Closure $handlerHook;
 
     public function __construct(?string $requestMethod = null, ?string $requestUri = null)
     {
