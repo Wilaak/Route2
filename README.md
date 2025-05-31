@@ -97,13 +97,11 @@ if ($router->allowedMethods) {
 
 ## How does it work?
 
-It follows a very dumb and simple approach: each request is checked against the routes in the order they were defined. As soon as it finds a match, it runs the associated handlers and terminates, so only the first matching route is processed.
-
->**Tip**: You can utilize prefixed [Route Groups](#route-groups) if you want to further optimize this process.
+It uses a dumb, sequential approach. Routes are checked in the order they are defined. The first matching route is executed, and the script exits.
 
 ## What is a Handler?
 
-You'll see the term **handler** mentioned throughout this document. But what does it mean? In Route2, a handler is simply a reference to the function or method that will be executed.
+In Route2, a handler is simply a reference to the function or method that will be executed.
 
 You can define handlers in a variety of ways:
 
@@ -133,9 +131,7 @@ You can define handlers in a variety of ways:
 
 ### Hooking Into the Handler
 
-You can take control over how handlers are run by setting a handler hook. This lets you plug in things like dependency injection, logging, or any custom logic before your route handler is called.
-
-To do this, use the `setHandlerHook()` method. The hook gives you access to the handler and its parameters, so you can decide exactly how the handler should be executed:
+Use `setHandlerHook()` to control how handlers are executed. The hook receives the handler and its parameters, letting you customize execution:
 
 ```php
 $router->setHandlerHook(function (mixed $handler, array $params): callable {
@@ -256,11 +252,9 @@ $router->expression([
 
 ## Middleware
 
-Middlewares are like filters or layers that process HTTP requests before and after they reach your application's core logic. Think of them as checkpoints—each middleware can inspect, modify, or halt a request. For example, an authentication middleware might redirect unauthenticated users to a login page, while letting authenticated users continue.
+A middleware is simply a [handler](#what-is-a-handler) that executes before or after you route handlers. For example, you might use middleware to check if a user is authenticated, log request details, or modify the response before sending it to the client.
 
 > **Note**: Middleware are only executed when a matching route is found. If a middleware handler returns `false`, the script will terminate.
-
-You can add middleware to your routes using the `before()` and `after()` methods. These methods accept a [handler](#what-is-a-handler).
 
 Once a middleware is registered, all routes defined afterwards will inherit them.
 
@@ -270,6 +264,18 @@ $router->before('your_middleware_handler');
 // Register middleware that runs after the handler
 $router->after('your_middleware_handler');
 // Routes defined below will inherit the middleware
+```
+
+Basic authentication example:
+
+```php
+$router->before(function () {
+    if (!isset($_SESSION['user'])) {
+        http_response_code(401);
+        echo 'Unauthorized';
+        return false; // Stop further execution
+    }
+});
 ```
 
 ## Route Groups
