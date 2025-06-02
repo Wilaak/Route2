@@ -69,11 +69,6 @@ class Route2
             unset($params[$lastParam]);
         }
 
-        $this->allowedMethods = array_unique(array_merge($this->allowedMethods, $methods));
-        if (!in_array($this->requestMethod, $methods)) {
-            return;
-        }
-
         foreach ($this->ctx['paramExpressions'] as $paramName => $expression) {
             if (!isset($params[$paramName])) {
                 continue;
@@ -92,6 +87,11 @@ class Route2
                 continue;
             }
             $params[$paramName] = $result;
+        }
+
+        $this->allowedMethods = array_unique(array_merge($this->allowedMethods, $methods));
+        if (!in_array($this->requestMethod, $methods)) {
+            return;
         }
 
         foreach ($this->ctx['beforeMiddleware'] as $middleware) {
