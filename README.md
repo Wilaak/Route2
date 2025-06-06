@@ -351,4 +351,4 @@ RewriteRule ^(.*)$ index.php/$1 [L]
 
 ## License
 
-This library is licensed under the **WTFPL-1.0**. Do whatever you want with it.
+This library is licensed under the **WTFPL-2.0**. Do whatever you want with it.
