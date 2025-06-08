@@ -4,12 +4,12 @@ A simple routing library for PHP web services.
 
 ### Features
 
-- 🧭 **Flexible URLs** Support for required, optional, and wildcard segments.
-- 🛡️ **Parameter Validation** Filter and transform parameters with regex or custom logic.
-- 🧩 **Middleware** Add logic before and after route handlers.
-- 🗂️ **Route Groups** Organize and share attributes across routes.
-- 🪝 **Handler Hooks** Intercept how route handlers are executed. (Integrate with DI-Containers)
-- ⚡ **Lightweight** Single-file, dependency-free and only ~175 lines of code.
+- **Flexible URLs** Support for required, optional, and wildcard segments.
+- **Parameter Validation** Filter and transform parameters with regex or custom logic.
+- **Middleware** Add logic before and after route handlers.
+- **Route Groups** Organize and share attributes across routes.
+- **Handler Hooks** Intercept how route handlers are executed. (Integrate with DI-Containers)
+- **Lightweight** Single-file, dependency-free and only ~175 lines of code.
 
 ## Table of Contents
 
