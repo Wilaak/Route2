@@ -13,10 +13,7 @@
     "autoload": {
         "psr-4": {
             "Wilaak\\Http\\": "src/"
-        },
-        "files": [
-            "src/functions.php"
-        ]
+        }
     },
     "require": {}
 }
