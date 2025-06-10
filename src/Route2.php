@@ -29,7 +29,7 @@ class Route2
     public const NODE_WILDCARD  = 420;
     public const NODE_ROUTES    = 1337;
 
-    private ?array $lastMatchedRoute = null;
+    private ?array $lastDispatchedRoute = null;
 
     private Closure $notFoundHandler;
     private Closure $methodNotAllowedHandler;
@@ -222,25 +222,24 @@ class Route2
                 continue;
             }
 
+            $this->lastDispatchedRoute = $route;
             foreach ($this->ctx['middleware'] as $middleware) {
                 $result = $this->getHandler($middleware)();
                 if ($result === false) {
-                    $this->lastMatchedRoute = $route;
                     return self::DISPATCH_MIDDLEWARE_BLOCKED;
                 }
             }
             $this->getHandler($route['handler'], $params)();
-            $this->lastMatchedRoute = $route;
             return self::DISPATCH_OK;
         }
 
         if (empty($allowedMethods)) {
             ($this->notFoundHandler)($requestMethod, $requestPath);
-            $this->lastMatchedRoute = null;
+            $this->lastDispatchedRoute = null;
             return self::DISPATCH_NOT_FOUND;
         } else {
             ($this->methodNotAllowedHandler)($requestMethod, $requestPath, $allowedMethods);
-            $this->lastMatchedRoute = null;
+            $this->lastDispatchedRoute = null;
             return self::DISPATCH_METHOD_NOT_ALLOWED;
         }
     }
@@ -396,14 +395,14 @@ class Route2
     }
 
     /**
-     * Retrieves information about the last matched route.
+     * Retrieves information about the dispatched route.
      *
-     * @return array|null An associative array containing the matched route information,
+     * @return array|null An associative array containing the dispatched route information,
      *                    or null if no route has been matched.
      */
-    public function getMatchedRouteInfo(): ?array
+    public function getDispatchedRoute(): ?array
     {
-        return $this->lastMatchedRoute;
+        return $this->lastDispatchedRoute;
     }
 
     /**

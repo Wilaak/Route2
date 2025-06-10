@@ -52,7 +52,7 @@
     - [Dispatching Routes](#dispatching-routes)
     - [Dispatch Return Codes](#dispatch-return-codes)
     - [Finding Matching Routes](#finding-matching-routes)
-    - [Getting the Latest Matched Route](#getting-the-latest-matched-route)
+    - [Getting the Latest Dispatched Route](#getting-the-latest-dispatched-route)
 - [Clean URLs: Removing `index.php` from Your Links](#clean-urls-removing-indexphp-from-your-links)
     - [FrankenPHP](#frankenphp)
     - [NGINX](#nginx)
@@ -439,20 +439,21 @@ These constants are defined in the router class and can be used for debugging or
 If you need to manually inspect or retrieve routes that match a specific request, you can use the `findMatchingRoutes()` method. This method returns an array of routes that match the given request:
 
 ```php
-$matchingRoutes = $router->findMatchingRoutes($request);
+// Remember to remove the query parameter from the path
+$matchingRoutes = $router->findMatchingRoutes('/user/123/comments');
 print_r($matchingRoutes);
 ```
 
 This is useful for debugging or implementing custom logic based on route matching.
 
-### Getting the Latest Matched Route
+### Getting the Latest Dispatched Route
 
-To retrieve information about the latest matched route, you can use the `getMatchedRoute()` method. This method returns details about the route that was most recently matched during the dispatch process:
+To retrieve information about the latest dispatched route, you can use the `getDispatchedRoute()` method. This method returns details about the route that was dispatched:
 
 ```php
-$router->dispatch($requestMethod, $requestPath);
-$matchedRoute = $router->getMatchedRoute();
-print_r($matchedRoute);
+$router->dispatch('GET', '/user/123');
+$dispatchedRoute = $router->getDispatchedRoute();
+print_r($dispatchedRoute);
 ```
 
 This is particularly helpful for debugging or logging purposes, as it provides insight into the route that was executed for the current request.
