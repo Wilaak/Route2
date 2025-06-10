@@ -1,6 +1,6 @@
 {
     "name": "wilaak/route2",
-    "description": "A simple routing library for PHP web services.",
+    "description": "Autowiring PHP request router.",
     "type": "library",
     "license": "WTFPL",
     "authors": [
@@ -13,7 +13,10 @@
     "autoload": {
         "psr-4": {
             "Wilaak\\Http\\": "src/"
-        }
+        },
+        "files": [
+            "src/functions.php"
+        ]
     },
     "require": {}
 }
