@@ -8,12 +8,13 @@ use ReflectionMethod;
 
 class Route2
 {
-    private array $ctx = [
+    private array $groupCtx = [
         'prefix'      => '',
         'middleware'  => [],
         'rules'       => [],
-        'order'       => 0,
     ];
+
+    private int $routeOrder = 0;
 
     public array $routes = [
         'names' => [],
@@ -25,9 +26,9 @@ class Route2
     public const DISPATCH_METHOD_NOT_ALLOWED = 2;
     public const DISPATCH_MIDDLEWARE_BLOCKED = 3;
 
-    public const NODE_PARAMETER = 69;
-    public const NODE_WILDCARD  = 420;
-    public const NODE_ROUTES    = 1337;
+    private const NODE_PARAMETER = 69;
+    private const NODE_WILDCARD  = 420;
+    private const NODE_ROUTES    = 1337;
 
     private ?array $lastDispatchedRoute = null;
 
@@ -53,7 +54,7 @@ class Route2
     public function addRoute(array $methods, string $pattern, mixed $handler, ?string $name = null): void
     {
         $segments = array_filter(
-            explode('/', $this->ctx['prefix'] . $pattern),
+            explode('/', $this->groupCtx['prefix'] . $pattern),
             fn($segment) => $segment !== ''
         );
 
@@ -76,19 +77,19 @@ class Route2
         }
 
         $currentNode[self::NODE_ROUTES] ??= [];
-        $currentNode[self::NODE_ROUTES][$this->ctx['order']] = [
+        $currentNode[self::NODE_ROUTES][$this->routeOrder] = [
             'methods'    => $methods,
-            'pattern'    => $this->ctx['prefix'] . $pattern,
+            'pattern'    => $this->groupCtx['prefix'] . $pattern,
             'handler'    => $handler,
-            'middleware' => $this->ctx['middleware'],
-            'rules'      => $this->ctx['rules'],
+            'middleware' => $this->groupCtx['middleware'],
+            'rules'      => $this->groupCtx['rules'],
         ];
 
         if ($name !== null) {
-            $this->routes['names'][$name] = $this->ctx['prefix'] . $pattern;
+            $this->routes['names'][$name] = $this->groupCtx['prefix'] . $pattern;
         }
 
-        $this->ctx['order']++;
+        $this->routeOrder++;
     }
 
     public function get(string $pattern, mixed $handler, ?string $name = null): void
@@ -126,19 +127,19 @@ class Route2
 
     public function addMiddleware(mixed $middleware): void
     {
-        $this->ctx['middleware'][] = $middleware;
+        $this->groupCtx['middleware'][] = $middleware;
     }
     public function addParameterRules(array $rules): void
     {
-        $this->ctx['rules'] += $rules;
+        $this->groupCtx['rules'] += $rules;
     }
 
     public function addGroup(string $prefix, callable $callback): void
     {
-        $previousContext = $this->ctx;
-        $this->ctx['prefix'] .= $prefix;
+        $previousContext = $this->groupCtx;
+        $this->groupCtx['prefix'] .= $prefix;
         $callback($this);
-        $this->ctx = $previousContext;
+        $this->groupCtx = $previousContext;
     }
 
     /**
@@ -197,7 +198,7 @@ class Route2
                 unset($params[$lastParamKey]);
             }
 
-            foreach ($this->ctx['rules'] as $paramName => $expression) {
+            foreach ($this->groupCtx['rules'] as $paramName => $expression) {
                 if (!isset($params[$paramName])) {
                     continue;
                 }
@@ -223,7 +224,7 @@ class Route2
             }
 
             $this->lastDispatchedRoute = $route;
-            foreach ($this->ctx['middleware'] as $middleware) {
+            foreach ($this->groupCtx['middleware'] as $middleware) {
                 $result = $this->getHandler($middleware)();
                 if ($result === false) {
                     return self::DISPATCH_MIDDLEWARE_BLOCKED;
@@ -291,7 +292,7 @@ class Route2
 
                 $resolvedParams[] = null;
             }
-            return $resolvedParams;
+            return $resolvedParams + $params;
         };
 
         if (is_array($handler)) {
