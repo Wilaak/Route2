@@ -13,10 +13,16 @@
     "autoload": {
         "psr-4": {
             "Wilaak\\Http\\": "src/"
-        },
-        "files": [
-            "src/functions.php"
-        ]
+        }
     },
-    "require": {}
+    "require": {
+        "psr/container": "^2.0"
+    },
+    "keywords": [
+        "router",
+        "psr-11",
+        "autowiring",
+        "http",
+        "php"
+    ]
 }
