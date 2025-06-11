@@ -5,10 +5,13 @@ namespace Wilaak\Http;
 use Closure;
 use ReflectionFunction;
 use ReflectionMethod;
+use ReflectionNamedType;
+
+use Psr\Container\ContainerInterface;
 
 class Route2
 {
-    private array $groupCtx = [
+    private array $context = [
         'prefix'      => '',
         'middleware'  => [],
         'rules'       => [],
@@ -21,10 +24,10 @@ class Route2
         'tree'  => [],
     ];
 
-    public const DISPATCH_OK                 = 0;
-    public const DISPATCH_NOT_FOUND          = 1;
-    public const DISPATCH_METHOD_NOT_ALLOWED = 2;
-    public const DISPATCH_MIDDLEWARE_BLOCKED = 3;
+    public const DISPATCH_FOUND       = 0;
+    public const DISPATCH_NOT_FOUND   = 1;
+    public const DISPATCH_NOT_ALLOWED = 2;
+    public const DISPATCH_BLOCKED     = 3;
 
     private const NODE_PARAMETER = 69;
     private const NODE_WILDCARD  = 420;
@@ -53,8 +56,9 @@ class Route2
 
     public function addRoute(array $methods, string $pattern, mixed $handler, ?string $name = null): void
     {
+        $fullPattern = $this->context['prefix'] . $pattern;
         $segments = array_filter(
-            explode('/', $this->groupCtx['prefix'] . $pattern),
+            explode('/', $fullPattern),
             fn($segment) => $segment !== ''
         );
 
@@ -79,14 +83,14 @@ class Route2
         $currentNode[self::NODE_ROUTES] ??= [];
         $currentNode[self::NODE_ROUTES][$this->routeOrder] = [
             'methods'    => $methods,
-            'pattern'    => $this->groupCtx['prefix'] . $pattern,
+            'pattern'    => $fullPattern,
             'handler'    => $handler,
-            'middleware' => $this->groupCtx['middleware'],
-            'rules'      => $this->groupCtx['rules'],
+            'middleware' => $this->context['middleware'],
+            'rules'      => $this->context['rules'],
         ];
 
         if ($name !== null) {
-            $this->routes['names'][$name] = $this->groupCtx['prefix'] . $pattern;
+            $this->routes['names'][$name] = $fullPattern;
         }
 
         $this->routeOrder++;
@@ -127,56 +131,48 @@ class Route2
 
     public function addMiddleware(mixed $middleware): void
     {
-        $this->groupCtx['middleware'][] = $middleware;
+        $this->context['middleware'][] = $middleware;
     }
     public function addParameterRules(array $rules): void
     {
-        $this->groupCtx['rules'] += $rules;
+        $this->context['rules'] += $rules;
     }
 
     public function addGroup(string $prefix, callable $callback): void
     {
-        $previousContext = $this->groupCtx;
-        $this->groupCtx['prefix'] .= $prefix;
+        $previousContext = $this->context;
+        $this->context['prefix'] .= $prefix;
         $callback($this);
-        $this->groupCtx = $previousContext;
+        $this->context = $previousContext;
     }
 
-    /**
-     * Dispatches the request to the appropriate route handler.
-     *
-     * @param string|null $requestMethod The HTTP request method (e.g., 'GET', 'POST'). If null, uses $_SERVER['REQUEST_METHOD'].
-     * @param string|null $requestPath   The request path to match against routes. If null, uses the relative request path.
-     * @return int Returns a dispatch status code:
-     *             - self::DISPATCH_OK if a route was successfully dispatched,
-     *             - self::DISPATCH_MIDDLEWARE_BLOCKED if middleware blocked the request,
-     *             - self::DISPATCH_NOT_FOUND if no route matched,
-     *             - self::DISPATCH_METHOD_NOT_ALLOWED if the method is not allowed for the matched route.
-     */
     public function dispatch(?string $requestMethod = null, ?string $requestPath = null): int
     {
-        $requestMethod = $requestMethod ?? $_SERVER['REQUEST_METHOD'];
-        $requestPath = $requestPath ?? $this->getRelativeRequestPath();
-        $routes = $this->findMatchingRoutes($requestPath);
+        $requestMethod    = $requestMethod ?? $_SERVER['REQUEST_METHOD'];
+        $requestPath      = $requestPath ?? $this->getRelativeRequestPath();
         $requestPathParts = explode('/', $requestPath);
+        $routes           = $this->findMatchingRoutes($requestPath);
+        $allowedMethods   = [];
 
-        $allowedMethods = [];
         foreach ($routes as $route) {
             $isWildcard = str_ends_with($route['pattern'], '*}');
-            $uriParts = explode('/', $route['pattern']);
-            if (
-                (!$isWildcard && count($requestPathParts) !== count($uriParts)) ||
-                ($isWildcard && count($requestPathParts) < count($uriParts))
-            ) continue;
+            $patternParts = explode('/', $route['pattern']);
 
-            foreach ($uriParts as $index => $part) {
+            if (
+                (!$isWildcard && count($requestPathParts) !== count($patternParts)) ||
+                ($isWildcard && count($requestPathParts) < count($patternParts))
+            ) {
+                continue;
+            }
+
+            foreach ($patternParts as $index => $part) {
                 if ($part !== $requestPathParts[$index] && !str_starts_with($part, '{')) {
                     continue 2;
                 }
             }
 
             $params = [];
-            foreach ($uriParts as $index => $part) {
+            foreach ($patternParts as $index => $part) {
                 if (str_starts_with($part, '{') && str_ends_with($part, '}')) {
                     $paramName = trim($part, '{}?*');
                     $params[$paramName] = $requestPathParts[$index];
@@ -185,30 +181,40 @@ class Route2
 
             $lastParamKey = array_key_last($params);
             $isOptional = str_ends_with($route['pattern'], '?}');
+
+            // If the last parameter is optional and empty, remove it from params
             if ($isOptional && isset($lastParamKey) && empty($params[$lastParamKey])) {
                 unset($params[$lastParamKey]);
             }
+
+            // If the last parameter is required (not optional or wildcard) and empty, skip this route
             if (!$isOptional && !$isWildcard && isset($lastParamKey) && empty($params[$lastParamKey])) {
                 continue;
             }
-            if ($isWildcard) {
-                $params[$lastParamKey] = implode('/', array_slice($requestPathParts, count($uriParts) - 1));
+
+            // If the route uses a wildcard parameter, join the remaining path segments into a single value
+            if ($isWildcard && isset($lastParamKey)) {
+                $params[$lastParamKey] = implode('/', array_slice($requestPathParts, count($patternParts) - 1));
             }
-            if ($isWildcard && empty($params[$lastParamKey])) {
+
+            // If the wildcard parameter is empty after joining, remove it from params
+            if ($isWildcard && isset($lastParamKey) && empty($params[$lastParamKey])) {
                 unset($params[$lastParamKey]);
             }
 
-            foreach ($this->groupCtx['rules'] as $paramName => $expression) {
+            foreach ($route['rules'] as $paramName => $rule) {
                 if (!isset($params[$paramName])) {
                     continue;
                 }
-                if (is_string($expression) && str_starts_with($expression, '#^')) {
-                    if (!preg_match($expression, $params[$paramName])) {
+                if (is_string($rule) && str_starts_with($rule, '#^')) {
+                    if (!preg_match($rule, $params[$paramName])) {
                         continue 2;
                     }
                     continue;
                 }
-                $result = $this->getHandler($expression, [$params[$paramName]])();
+                $result = $this->getHandler($rule, [
+                    $paramName => $params[$paramName]
+                ])();
                 if ($result === false) {
                     continue 2;
                 }
@@ -224,14 +230,14 @@ class Route2
             }
 
             $this->lastDispatchedRoute = $route;
-            foreach ($this->groupCtx['middleware'] as $middleware) {
+            foreach ($route['middleware'] as $middleware) {
                 $result = $this->getHandler($middleware)();
                 if ($result === false) {
-                    return self::DISPATCH_MIDDLEWARE_BLOCKED;
+                    return self::DISPATCH_BLOCKED;
                 }
             }
             $this->getHandler($route['handler'], $params)();
-            return self::DISPATCH_OK;
+            return self::DISPATCH_FOUND;
         }
 
         if (empty($allowedMethods)) {
@@ -241,79 +247,54 @@ class Route2
         } else {
             ($this->methodNotAllowedHandler)($requestMethod, $requestPath, $allowedMethods);
             $this->lastDispatchedRoute = null;
-            return self::DISPATCH_METHOD_NOT_ALLOWED;
+            return self::DISPATCH_NOT_ALLOWED;
         }
     }
 
-    private function getHandler(mixed $handler, array $params = []): callable
+    private function getHandler(mixed $handler, array $handlerParams = []): callable
     {
-        if (empty($this->container)) {
+        if (!isset($this->container)) {
             return is_array($handler)
-                ? fn() => (new $handler[0])->{$handler[1]}(...$params)
-                : fn() => $handler(...$params);
+                ? fn() => (new $handler[0])->{$handler[1]}(...array_values($handlerParams))
+                : fn() => $handler(...array_values($handlerParams));
         }
 
-        $resolveDependencies = function ($callable) use ($params) {
-            $reflection = is_array($callable)
-                ? new ReflectionMethod($callable[0], $callable[1])
-                : new ReflectionFunction($callable);
+        $resolveDependencies = function ($callable) use ($handlerParams) {
+            if (is_array($callable)) {
+                $reflection = new ReflectionMethod($callable[0], $callable[1]);
+            } else {
+                $reflection = new ReflectionFunction($callable);
+            }
 
             $resolvedParams = [];
-            foreach ($reflection->getParameters() as $index => $param) {
+            foreach ($reflection->getParameters() as $param) {
+                $paramName = $param->getName();
                 $type = $param->getType();
-                if ($type && !$type->isBuiltin()) {
+
+                if (array_key_exists($paramName, $handlerParams)) {
+                    continue;
+                }
+
+                if ($type instanceof ReflectionNamedType && !$type->isBuiltin()) {
                     $typeName = $type->getName();
-                    // Check if $params contains an instance of the required class type
-                    $found = false;
-                    foreach ($params as $value) {
-                        if (is_object($value) && is_a($value, $typeName)) {
-                            $resolvedParams[] = $value;
-                            $found = true;
-                            break;
-                        }
-                    }
-                    if ($found) {
-                        continue;
-                    }
-                    // Otherwise, get from container
-                    $resolvedParams[] = $this->container->get($typeName);
-                    continue;
+                    $resolvedParams[$paramName] = $this->container->get($typeName);
                 }
-
-                if (array_key_exists($index, $params)) {
-                    $resolvedParams[] = $params[$index];
-                    continue;
-                }
-
-                if ($param->isDefaultValueAvailable()) {
-                    $resolvedParams[] = $param->getDefaultValue();
-                    continue;
-                }
-
-                $resolvedParams[] = null;
             }
-            return $resolvedParams + $params;
+
+            return array_merge($resolvedParams, $handlerParams);
         };
 
         if (is_array($handler)) {
-            // [ClassName::class, 'method']
-            $instance = is_string($handler[0]) ? $this->container->get($handler[0]) : $handler[0];
+            $instance = $this->container->get($handler[0]);
             $callable = [$instance, $handler[1]];
             $resolvedParams = $resolveDependencies($callable);
-            return fn() => call_user_func_array($callable, $resolvedParams);
+            return fn() => $callable(...array_values($resolvedParams));
         }
 
-        // Callable (closure, function, invokable object)
         $resolvedParams = $resolveDependencies($handler);
-        return fn() => call_user_func_array($handler, $resolvedParams);
+        return fn() => $handler(...array_values($resolvedParams));
     }
 
-    /**
-     * Finds and returns all routes that match the given path.
-     *
-     * @param string $path The path to match against the route tree.
-     * @return array An array of matching routes with their order.
-     */
     public function findMatchingRoutes(string $path): array
     {
         $segments = array_filter(
@@ -343,15 +324,6 @@ class Route2
         return $foundRoutes;
     }
 
-    /**
-     * Returns the relative request path, removing the script name or script directory from the beginning.
-     *
-     * Example:
-     *   If SCRIPT_NAME is '/index.php' and REQUEST_URI is '/index.php/foo/bar?baz=1',
-     *   this returns '/foo/bar'.
-     *
-     * @return string The relative request path.
-     */
     public function getRelativeRequestPath(): string
     {
         $uri = urldecode(strtok($_SERVER['REQUEST_URI'], '?'));
@@ -371,11 +343,6 @@ class Route2
         return $uri === '' ? '/' : $uri;
     }
 
-    /**
-     * Retrieves all routes from the internal route tree as a flat array.
-     *
-     * @return array An array of routes.
-     */
     public function getRoutes(): array
     {
         $routes = [];
@@ -395,24 +362,11 @@ class Route2
         return $routes;
     }
 
-    /**
-     * Retrieves information about the dispatched route.
-     *
-     * @return array|null An associative array containing the dispatched route information,
-     *                    or null if no route has been matched.
-     */
     public function getDispatchedRoute(): ?array
     {
         return $this->lastDispatchedRoute;
     }
 
-    /**
-     * Gets the URI for a named route, replacing parameters with their values.
-     *
-     * @param string $name   The name of the route.
-     * @param array  $params Optional parameters to replace or append as query parameters.
-     * @return string|null   The generated URL, or null if the route name does not exist.
-     */
     public function getUriFor(string $name, array $params = []): ?string
     {
         $uri = $this->routes['names'][$name] ?? null;
