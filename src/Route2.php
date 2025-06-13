@@ -41,7 +41,7 @@ class Route2
     public function __construct(
         ?Closure $notFoundHandler = null,
         ?Closure $methodNotAllowedHandler = null,
-        private ?object $container = null
+        private ?ContainerInterface $container = null
     ) {
         $this->notFoundHandler = $notFoundHandler ?? function ($method, $path) {
             http_response_code(404);

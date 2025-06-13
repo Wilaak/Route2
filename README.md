@@ -1,14 +1,16 @@
 # Route2
 
-Simple request router for PHP
+A fast and simple autowiring request router for PHP web services
+
 ## Table of Contents
 
 - [Install](#install)
 - [Quick Start](#quick-start)
+    - [Classic Mode](#classic-mode)
+    - [FrankenPHP Worker Mode](#frankenphp-worker-mode)
 - [What is a Handler?](#what-is-a-handler)
 - [Autowiring](#autowiring)
     - [Usage Example](#usage-example)
-    - [Using Autowiring with Parameter Rules](#using-autowiring-with-parameter-rules)
 - [Basic Routing](#basic-routing)
     - [Available Methods](#available-methods)
     - [Multiple HTTP-verbs](#multiple-http-verbs)
@@ -54,20 +56,64 @@ Requires PHP 8.3 or newer
 
 ## Quick Start
 
-Heres an example to get you up and running quickly.
+Heres are some examples to get you up and running quickly.
+
+### Classic Mode
 
 ```PHP
 <?php
+// public/index.php
 
 require __DIR__ . '/../vendor/autoload.php';
 
 $router = new Wilaak\Http\Route2();
 
-$router->get('/{world?}', function ($world = 'Hello') {
-    echo "Hello, {$world}!"
+$router->get('/{world?}', function ($world = 'World') {
+    echo "Hello, {$world}!";
 });
 
 $router->dispatch();
+```
+
+### FrankenPHP Worker Mode
+
+Boot your application once and keep serving from memory:
+
+```PHP
+<?php
+// public/index.php
+
+// Prevent worker script termination when a client connection is interrupted
+ignore_user_abort(true);
+
+// Boot your app
+require __DIR__.'/../vendor/autoload.php';
+
+$router = new Wilaak\Http\Route2();
+
+$router->get('/{world?}', function ($world = 'World') {
+    echo "Hello, {$world}!";
+});
+
+// Handler outside the loop for better performance (doing less work)
+$handler = static function () use ($router) {
+    // Called when a request is received,
+    // superglobals, php://input and the like are reset
+    $router->dispatch();
+};
+
+$maxRequests = (int)($_SERVER['MAX_REQUESTS'] ?? 0);
+for ($nbRequests = 0; !$maxRequests || $nbRequests < $maxRequests; ++$nbRequests) {
+    $keepRunning = \frankenphp_handle_request($handler);
+
+    // Do something after sending the HTTP response
+    $myApp->terminate();
+
+    // Call the garbage collector to reduce the chances of it being triggered in the middle of a page generation
+    gc_collect_cycles();
+
+    if (!$keepRunning) break;
+}
 ```
 
 ## What is a Handler?
@@ -95,14 +141,24 @@ You can define handlers in multiple ways:
     ```
 
 - **Anonymous Function (Closure)**  
-    > **Important:**  
+    > **Note:**  
     > Using anonymous functions is **not going to work** if you want to cache the routes as they cannot be serialized
 
-    You can use an anonymous function directly as a handler:
+    You can use an anonymous function directly as a handler using the standard `function` syntax:
     ```php
     function () {
-        echo 'Hello!';
+        echo 'Greetings!';
     }
+    ```
+    Or, using the short `function(...)` syntax (PHP 8.1+):
+    ```php
+    greeting(...)
+    // Or
+    StaticController::greeting(...)
+    ```
+    Or, using arrow function syntax (PHP 7.4+):
+    ```php
+    fn() => print('Greeitings!');
     ```
 
 ## Autowiring
@@ -150,22 +206,6 @@ $router->get('/', function (DatabaseService $db) {
 });
 
 $router->dispatch();
-```
-
-### Using Autowiring with Parameter Rules
-
-You can combine autowiring with parameter rules to automatically resolve dependencies and validate or transform route parameters. For instance, you might want to fetch a `User` object directly from the database based on a route parameter:
-
-```php
-$router->addParameterRules([
-    'user' => function (UserRepository $repo, $userId): User|false {
-        return $repo->find($userId) ?: false;
-    }
-]);
-
-$router->get('/profile/{user}', function (DatabaseService $db, User $user) {
-    echo "Profile for: " . $user->name;
-});
 ```
 
 ## Basic Routing
@@ -226,7 +266,8 @@ $router->get('/posts/{post}/comments/{comment}', function ($post, $comment) {
 
 Specify a route parameter that may not always be present in the URI. You may do so by placing a `?` mark after the parameter name.
 
->**Note:** Must be the last segment. Make sure to give the route's corresponding variable a default value:
+> **Note:**  
+> Must be the last segment. Make sure to give the route's corresponding variable a default value:
 
 ```php
 function handler($name = 'John') {
@@ -240,7 +281,8 @@ $router->get('/user/{name?}', 'handler');
 
 Capture the whole segment including slashes by placing a `*` after the parameter name.
 
->**Note:** Must be the last segment. Make sure to give the route's corresponding variable a default value:
+> **Note:**  
+> Must be the last segment. Make sure to give the route's corresponding variable a default value:
 
 ```php
 function handler($any = 'Empty') {
@@ -253,6 +295,9 @@ $router->get('/somewhere/{any*}', 'handler');
 ### Parameter Rules
 
 You can enforce specific formats for your route parameters by using the `addParameterRules()` method. This method accepts an associative array where the keys represent parameter names, and the values can either be a regex pattern or a [handler](#what-is-a-handler).
+
+> **Note:**  
+> When using handlers as parameter rules, middlewares are **not** executed before the rules are applied. If you need to perform actions such as rate limiting, ensure this logic is handled within the rule handler itself or in another appropriate place.
 
 - **Regex**: Ensures the parameter matches the specified pattern. If not, the route will be skipped.
 - **Handler**: The [handler](#what-is-a-handler) receives the parameter value as a positional argument. It should return `true` to allow the parameter, `false` to skip the route, or any other value to assign it directly to the parameter.
@@ -273,6 +318,8 @@ $router->addParameterRules([
     }
 ]);
 ```
+
+While this is possible, you should consider the implications.
 
 ## Middleware
 
@@ -489,7 +536,7 @@ The router is rarely going to be the bottleneck of your application. Most likely
 
 The router uses an efficient tree-based algorithm for resolving routes, however rebuilding this tree for each request is going to slow down performance. The solution? Cache the already existing route tree.
 
-> **Important:**  
+> **Note:**  
 > Anonymous functions (closures) are **not supported** for route caching because they cannot be serialized.
 
 > **Note:**  
@@ -516,7 +563,7 @@ if (!file_exists('routecache.php')) {
 $router->dispatch();
 ```
 
-By storing your routes in a PHP file, you take advantage of PHP’s OPcache, which compiles and stores the route definitions in memory. 
+By storing your routes in a PHP file, you take advantage of PHP’s OPcache, which compiles and stores the route definitions in memory. Making startup times nearly instantaneous.
 
 ## License
 
