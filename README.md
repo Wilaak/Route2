@@ -297,7 +297,7 @@ $router->get('/somewhere/{any*}', 'handler');
 You can enforce specific formats for your route parameters by using the `addParameterRules()` method. This method accepts an associative array where the keys represent parameter names, and the values can either be a regex pattern or a [handler](#what-is-a-handler).
 
 > **Note:**  
-> When using handlers as parameter rules, middlewares are **not** executed before the rules are applied. If you need to perform actions such as rate limiting, ensure this logic is handled within the rule handler itself or in another appropriate place.
+> Avoid making rule handlers overly complex. Since middlewares are **not** executed before parameter rules are applied, any logic such as rate limiting or authentication must be handled within the rule handler itself. Keeping rule handlers simple and focused on validation or transformation is recommended for maintainability.
 
 - **Regex**: Ensures the parameter matches the specified pattern. If not, the route will be skipped.
 - **Handler**: The [handler](#what-is-a-handler) receives the parameter value as a positional argument. It should return `true` to allow the parameter, `false` to skip the route, or any other value to assign it directly to the parameter.
@@ -318,8 +318,6 @@ $router->addParameterRules([
     }
 ]);
 ```
-
-While this is possible, you should consider the implications.
 
 ## Middleware
 
