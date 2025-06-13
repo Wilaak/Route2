@@ -1,6 +1,6 @@
 {
     "name": "wilaak/route2",
-    "description": "Autowiring PHP request router.",
+    "description": "A fast and simple autowiring request router for PHP web services",
     "type": "library",
     "license": "WTFPL",
     "authors": [
