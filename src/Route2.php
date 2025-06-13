@@ -295,7 +295,7 @@ class Route2
         return fn() => $handler(...array_values($resolvedParams));
     }
 
-    public function findMatchingRoutes(string $path): array
+    private function findMatchingRoutes(string $path): array
     {
         $segments = array_filter(
             explode('/', $path),
@@ -305,19 +305,24 @@ class Route2
         $foundRoutes = [];
         $resolve = function ($tree, $segments) use (&$resolve, &$foundRoutes) {
             if (empty($segments) && isset($tree[self::NODE_ROUTES])) {
-                return $foundRoutes += $tree[self::NODE_ROUTES];
+                $foundRoutes += $tree[self::NODE_ROUTES];
+                // Do not return here; parameter nodes at this level may also have routes
             }
             $segment = array_shift($segments);
-            if (isset($tree[self::NODE_WILDCARD])) {
-                $resolve($tree[self::NODE_WILDCARD], []);
+            // 1. Try explicit/static route first
+            if ($segment !== null && isset($tree[$segment])) {
+                $resolve($tree[$segment], $segments);
             }
+            // 2. Try parameter node at this level (even if segment is null)
             if (isset($tree[self::NODE_PARAMETER])) {
                 $resolve($tree[self::NODE_PARAMETER], $segments);
             }
-            if (isset($tree[$segment])) {
-                $resolve($tree[$segment], $segments);
+            // 3. Try wildcard node at this level (even if segment is null)
+            if (isset($tree[self::NODE_WILDCARD])) {
+                $resolve($tree[self::NODE_WILDCARD], []);
             }
         };
+
 
         $resolve($this->routes['tree'], $segments);
         ksort($foundRoutes);
